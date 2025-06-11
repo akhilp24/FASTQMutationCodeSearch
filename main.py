@@ -17,8 +17,8 @@ def read_fastq(file_path: str):
             if not header:  # End of file
                 break
             sequence = f.readline().strip()
-            _ = f.readline()  # Skip the '+' line
-            _ = f.readline()  # Skip the quality line
+            _ = f.readline()  
+            _ = f.readline() 
             yield sequence
 
 def get_reverse_complement(sequence: str) -> str:

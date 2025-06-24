@@ -60,33 +60,72 @@ def main():
     # Load age data
     age_data = load_age_data()
     
+    # Expanded patterns for all 6 mutation types at 3 positions each (G-strand context)
     patterns = {
         'c_strand': "CCCTAACCCTAA",  # C-strand pattern
         'g_strand': "GGGTTAGGGTTA",  # G-strand pattern
+        # G-strand mutations (positions 1, 2, 3)
+        'G>A_g1': "GGGTTAAGGTTA",
+        'G>A_g2': "GGGTTAGAGTTA",
+        'G>A_g3': "GGGTTAGGATTA",
+        'G>C_g1': "GGGTTACGGTTA",
+        'G>C_g2': "GGGTTAGCGTTA",
+        'G>C_g3': "GGGTTAGGCTTA",
         'G>T_g1': "GGGTTATGGTTA",
         'G>T_g2': "GGGTTAGTGTTA",
         'G>T_g3': "GGGTTAGGTTTA",
-        'G>A_g1': "GGGTTAAGGTTA",
-        'G>A_g2': "GGGTTAGAGTTA",
-        'G>A_g3': "GGGTTAGGATTA"
+        # C-strand mutations (positions 1, 2, 3)
+        'C>A_c1': "CCATAACCCTAA",
+        'C>A_c2': "CCCTAAACCTAA",
+        'C>A_c3': "CCCTAACCATAA",
+        'C>G_c1': "CCGTAACCCTAA",
+        'C>G_c2': "CCCTAGGCCTAA",
+        'C>G_c3': "CCCTAACCCTGA",
+        'C>T_c1': "CCTTAACCCTAA",
+        'C>T_c2': "CCCTATTCCTAA",
+        'C>T_c3': "CCCTAACCCTTA",
+        # T-strand mutations (positions 1, 2, 3)
+        'T>A_t1': "GGGTAAGGGTTA",
+        'T>A_t2': "GGGTTAAAGTTA",
+        'T>A_t3': "GGGTTAGGGAAA",
+        'T>C_t1': "GGGTCAGGGTTA",
+        'T>C_t2': "GGGTTACGGTTA",
+        'T>C_t3': "GGGTTAGGGTCA",
+        'T>G_t1': "GGGTGAGGGTTA",
+        'T>G_t2': "GGGTTAGGGGTA",
+        'T>G_t3': "GGGTTAGGGGTA",
     }
     
     # Create CSV file
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
         # Define CSV headers
         fieldnames = [
-            'FileName', 'Age', '2x_cstrand', '2xg_strand', 
-            'G_T_g1', 'G_T_g2', 'G_T_g3', 
+            'FileName', 'Age', '2x_cstrand', '2xg_strand',
+            # G-strand mutation counts
             'G_A_g1', 'G_A_g2', 'G_A_g3',
-            'G_T_g1_over_total_g_per_1k',
-            'G_T_g2_over_total_g_per_1k',
-            'G_T_g3_over_total_g_per_1k',
-            'G_A_g1_over_total_g_per_1k',
-            'G_A_g2_over_total_g_per_1k',
-            'G_A_g3_over_total_g_per_1k',
-            'pos1_mutation_rate_per_1k',
-            'pos2_mutation_rate_per_1k',
-            'pos3_mutation_rate_per_1k',
+            'G_C_g1', 'G_C_g2', 'G_C_g3',
+            'G_T_g1', 'G_T_g2', 'G_T_g3',
+            # C-strand mutation counts
+            'C_A_c1', 'C_A_c2', 'C_A_c3',
+            'C_G_c1', 'C_G_c2', 'C_G_c3',
+            'C_T_c1', 'C_T_c2', 'C_T_c3',
+            # T-strand mutation counts
+            'T_A_t1', 'T_A_t2', 'T_A_t3',
+            'T_C_t1', 'T_C_t2', 'T_C_t3',
+            'T_G_t1', 'T_G_t2', 'T_G_t3',
+            # Normalized rates (per 1k g_strand)
+            'G_A_g1_per_1k', 'G_A_g2_per_1k', 'G_A_g3_per_1k',
+            'G_C_g1_per_1k', 'G_C_g2_per_1k', 'G_C_g3_per_1k',
+            'G_T_g1_per_1k', 'G_T_g2_per_1k', 'G_T_g3_per_1k',
+            # Normalized rates (per 1k c_strand)
+            'C_A_c1_per_1k', 'C_A_c2_per_1k', 'C_A_c3_per_1k',
+            'C_G_c1_per_1k', 'C_G_c2_per_1k', 'C_G_c3_per_1k',
+            'C_T_c1_per_1k', 'C_T_c2_per_1k', 'C_T_c3_per_1k',
+            # Normalized rates (per 1k t_strand, if needed)
+            'T_A_t1_per_1k', 'T_A_t2_per_1k', 'T_A_t3_per_1k',
+            'T_C_t1_per_1k', 'T_C_t2_per_1k', 'T_C_t3_per_1k',
+            'T_G_t1_per_1k', 'T_G_t2_per_1k', 'T_G_t3_per_1k',
+            # Totals
             'total_mutations_over_total_g_per_1k'
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -100,87 +139,53 @@ def main():
                 counts['c_strand'] += count_patterns(sequence, patterns['c_strand'])
                 # Count g-strand in forward direction only
                 counts['g_strand'] += count_patterns(sequence, patterns['g_strand'])
-                
-                # Count mutations in both directions
+                # Count all mutation patterns
                 for name, pattern in patterns.items():
                     if name not in ['c_strand', 'g_strand']:
                         counts[name] += count_patterns(sequence, pattern)
             
-            # Get just the filename from the path
             filename = os.path.basename(file_path)
-            # Remove .fastq or .fastq.gz extension for matching
             filename_base = filename.replace('.fastq', '').replace('.gz', '')
-            
-            # Get age from the data table
             age = age_data.get(filename_base, '')
-            
-            # Calculate per 1k rates
             g_strand_total = counts['g_strand']
-            if g_strand_total > 0:  # Avoid division by zero
-                g_t_g1_rate = (counts['G>T_g1'] / g_strand_total) * 1000
-                g_t_g2_rate = (counts['G>T_g2'] / g_strand_total) * 1000
-                g_t_g3_rate = (counts['G>T_g3'] / g_strand_total) * 1000
-                
-                g_a_g1_rate = (counts['G>A_g1'] / g_strand_total) * 1000
-                g_a_g2_rate = (counts['G>A_g2'] / g_strand_total) * 1000
-                g_a_g3_rate = (counts['G>A_g3'] / g_strand_total) * 1000
-                
-                pos1_rate = ((counts['G>A_g1'] + counts['G>T_g1']) / g_strand_total) * 1000
-                pos2_rate = ((counts['G>A_g2'] + counts['G>T_g2']) / g_strand_total) * 1000
-                pos3_rate = ((counts['G>A_g3'] + counts['G>T_g3']) / g_strand_total) * 1000
-                
-                total_mutations = sum(counts[p] for p in patterns if p not in ['c_strand', 'g_strand'])
-                total_mutation_rate = (total_mutations / g_strand_total) * 1000
-            else:
-                g_t_g1_rate = g_t_g2_rate = g_t_g3_rate = 0
-                g_a_g1_rate = g_a_g2_rate = g_a_g3_rate = 0
-                pos1_rate = pos2_rate = pos3_rate = 0
-                total_mutation_rate = 0
-            
-            # Write row to CSV
-            writer.writerow({
+            c_strand_total = counts['c_strand']
+            # Calculate per 1k rates for each mutation type
+            def per_1k(val, total):
+                return (val / total) * 1000 if total > 0 else 0
+            row = {
                 'FileName': filename,
                 'Age': age,
-                '2x_cstrand': counts['c_strand'],
-                '2xg_strand': counts['g_strand'],
-                'G_T_g1': counts['G>T_g1'],
-                'G_T_g2': counts['G>T_g2'],
-                'G_T_g3': counts['G>T_g3'],
-                'G_A_g1': counts['G>A_g1'],
-                'G_A_g2': counts['G>A_g2'],
-                'G_A_g3': counts['G>A_g3'],
-                'G_T_g1_over_total_g_per_1k': g_t_g1_rate,
-                'G_T_g2_over_total_g_per_1k': g_t_g2_rate,
-                'G_T_g3_over_total_g_per_1k': g_t_g3_rate,
-                'G_A_g1_over_total_g_per_1k': g_a_g1_rate,
-                'G_A_g2_over_total_g_per_1k': g_a_g2_rate,
-                'G_A_g3_over_total_g_per_1k': g_a_g3_rate,
-                'pos1_mutation_rate_per_1k': pos1_rate,
-                'pos2_mutation_rate_per_1k': pos2_rate,
-                'pos3_mutation_rate_per_1k': pos3_rate,
-                'total_mutations_over_total_g_per_1k': total_mutation_rate
-            })
+                '2x_cstrand': c_strand_total,
+                '2xg_strand': g_strand_total,
+            }
+            # G-strand
+            for mut in ['G>A', 'G>C', 'G>T']:
+                for i in range(1, 4):
+                    key = f'{mut}_g{i}'
+                    row[f'{mut.replace(">", "_")}_g{i}'] = counts.get(key, 0)
+                    row[f'{mut.replace(">", "_")}_g{i}_per_1k'] = per_1k(counts.get(key, 0), g_strand_total)
+            # C-strand
+            for mut in ['C>A', 'C>G', 'C>T']:
+                for i in range(1, 4):
+                    key = f'{mut}_c{i}'
+                    row[f'{mut.replace(">", "_")}_c{i}'] = counts.get(key, 0)
+                    row[f'{mut.replace(">", "_")}_c{i}_per_1k'] = per_1k(counts.get(key, 0), c_strand_total)
+            # T-strand (if needed, else can be omitted)
+            for mut in ['T>A', 'T>C', 'T>G']:
+                for i in range(1, 4):
+                    key = f'{mut}_t{i}'
+                    row[f'{mut.replace(">", "_")}_t{i}'] = counts.get(key, 0)
+                    row[f'{mut.replace(">", "_")}_t{i}_per_1k'] = per_1k(counts.get(key, 0), g_strand_total)  # or t_strand_total if available
+            # Total mutations (sum all mutation counts)
+            total_mutations = sum(counts[k] for k in counts if k not in ['c_strand', 'g_strand'])
+            row['total_mutations_over_total_g_per_1k'] = per_1k(total_mutations, g_strand_total)
+            writer.writerow(row)
             
             # Print to console as well
             print(f"\nProcessing {filename}:")
             print(f"Age: {age}")
-            print(f"2x cstrand total: {counts['c_strand']}")
-            print(f"From strand:")
-            print(f"  c1: {counts['c_strand']}")
-            print(f"  c2: {counts['c_strand']}")
-            print(f"  c3: {counts['c_strand']}")
-            
-            print(f"\n2x g strand total: {counts['g_strand']}")
-            
-            print("\nG>T:")
-            print(f"  g1: {counts['G>T_g1']}")
-            print(f"  g2: {counts['G>T_g2']}")
-            print(f"  g3: {counts['G>T_g3']}")
-            
-            print("\nG>A:")
-            print(f"  g1: {counts['G>A_g1']}")
-            print(f"  g2: {counts['G>A_g2']}")
-            print(f"  g3: {counts['G>A_g3']}")
+            print(f"2x cstrand total: {c_strand_total}")
+            print(f"2x g strand total: {g_strand_total}")
 
 if __name__ == "__main__":
     main()

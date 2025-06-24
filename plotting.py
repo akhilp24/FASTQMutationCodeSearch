@@ -21,56 +21,47 @@ def plot_mutational_signatures(csv_path, output_path='mutational_signatures.png'
         ('T>G', '#F6C4C4'),
     ]
 
-    # For demonstration, we will use the G>T and G>A as C>T and C>A, etc.
-    # You may need to adjust this mapping based on your actual data columns
-    # Here, we assume G>T_g1/g2/g3 are C>A, G>A_g1/g2/g3 are C>T, etc.
-    # This is a placeholder and should be mapped to your actual mutation context
-    mutation_columns = [
-        ['G_T_g1', 'G_T_g2', 'G_T_g3'],  # C>A
-        [],                              # C>G (not present in your data)
-        ['G_A_g1', 'G_A_g2', 'G_A_g3'],  # C>T
-        [],                              # T>A (not present in your data)
-        [],                              # T>C (not present in your data)
-        [],                              # T>G (not present in your data)
-    ]
+    # Aggregate columns for each mutation type (sum over all positions and both G- and C-strand contexts)
+    mutation_columns = {
+        'C>A': ['C_A_c1', 'C_A_c2', 'C_A_c3'],
+        'C>G': ['C_G_c1', 'C_G_c2', 'C_G_c3'],
+        'C>T': ['C_T_c1', 'C_T_c2', 'C_T_c3'],
+        'T>A': ['T_A_t1', 'T_A_t2', 'T_A_t3'],
+        'T>C': ['T_C_t1', 'T_C_t2', 'T_C_t3'],
+        'T>G': ['T_G_t1', 'T_G_t2', 'T_G_t3'],
+    }
+    # Add G-strand context for C>X mutations (G>X_g1, g2, g3)
+    mutation_columns['C>A'] += ['G_T_g1', 'G_T_g2', 'G_T_g3']  # G>T is C>A on the opposite strand
+    mutation_columns['C>G'] += ['G_C_g1', 'G_C_g2', 'G_C_g3']  # G>C is C>G on the opposite strand
+    mutation_columns['C>T'] += ['G_A_g1', 'G_A_g2', 'G_A_g3']  # G>A is C>T on the opposite strand
 
     # Aggregate counts for each mutation type
     bar_heights = []
     bar_colors = []
     bar_labels = []
-    total_mutations = df[sum(mutation_columns, [])].sum().sum()  # Total count of all mutations
+    total_mutations = df[sum(mutation_columns.values(), [])].sum().sum()  # Total count of all mutations
 
-    for i, (mut_label, color) in enumerate(mutation_types):
-        cols = mutation_columns[i]
-        if cols:
-            values = df[cols].sum(axis=0)
-            percentages = (values / total_mutations) * 100  # Convert counts to percentages
-            bar_heights.extend(percentages)
-            bar_colors.extend([color] * len(values))
-            bar_labels.extend([mut_label] * len(values))
-        else:
-            # Add placeholders for missing types
-            bar_heights.extend([0, 0, 0])
-            bar_colors.extend([color] * 3)
-            bar_labels.extend([mut_label] * 3)
+    for mut_label, color in mutation_types:
+        cols = mutation_columns[mut_label]
+        values = df[cols].sum(axis=0)
+        percentage = (values.sum() / total_mutations) * 100 if total_mutations > 0 else 0
+        bar_heights.append(percentage)
+        bar_colors.append(color)
+        bar_labels.append(mut_label)
 
     x = np.arange(len(bar_heights))
 
-    fig, ax = plt.subplots(figsize=(6, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
     bars = ax.bar(x, bar_heights, color=bar_colors, edgecolor='black')
 
-    # Add colored boxes and mutation type labels below each group
-    group_positions = np.arange(0, len(bar_heights), 3)
+    # Add mutation type labels below each bar
     for i, (mut_label, color) in enumerate(mutation_types):
-        # Draw colored box below bars
-        # ax.add_patch(plt.Rectangle((group_positions[i] - 0.5, -max(bar_heights)*0.08), 3, max(bar_heights)*0.07, color=color, clip_on=False, zorder=2))
-        # Draw label below colored box
-        ax.text(group_positions[i] + 1, -max(bar_heights)*0.15, mut_label, ha='center', va='center', color='black' if color != 'black' else 'black', fontsize=16, fontweight='normal')
+        ax.text(i, -max(bar_heights)*0.05, mut_label, ha='center', va='center', color='black', fontsize=14, fontweight='normal')
 
     ax.set_xticks([])
     ax.set_yticks(np.linspace(0, max(bar_heights), 5))
     ax.set_xlim(-0.5, len(bar_heights) - 0.5)
-    ax.set_ylim(-max(bar_heights)*0.2, max(bar_heights) + max(bar_heights)*0.2)
+    ax.set_ylim(-max(bar_heights)*0.1, max(bar_heights) + max(bar_heights)*0.2)
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)

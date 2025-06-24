@@ -51,7 +51,7 @@ def get_fastq_files(directory: str):
 
 def main():
     # Get all FASTQ files from the greider_data directory
-    fastq_files = get_fastq_files("greider_data")
+    fastq_files = get_fastq_files("greider_data_download")
     
     if not fastq_files:
         print("No FASTQ files found in greider_data directory")

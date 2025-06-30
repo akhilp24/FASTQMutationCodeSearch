@@ -2,8 +2,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import os
+import seaborn as sns
 
 def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path):
+    # Set seaborn style for better-looking plots
+    sns.set_style("whitegrid")
+    sns.set_palette("husl")
+    
     # Aggregate counts for each mutation type, position, and strand context for a single row
     bar_heights = []
     bar_colors = []
@@ -23,32 +28,55 @@ def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_
                 bar_heights.append(percentage)
                 bar_colors.append(color)
                 bar_labels.append(f"{mut_label} {context_name} pos{i+1}")
+    
     x = np.arange(len(bar_heights))
-    fig, ax = plt.subplots(figsize=(15, 8))
-    bars = ax.bar(x, bar_heights, color=bar_colors, edgecolor='black')
+    
+    # Create figure with seaborn styling
+    fig, ax = plt.subplots(figsize=(16, 10))
+    
+    # Create the bar plot with seaborn styling
+    bars = sns.barplot(x=x, y=bar_heights, palette=bar_colors, ax=ax, edgecolor='black', linewidth=0.5)
+    
+    # Customize the plot
     for i, label in enumerate(bar_labels):
         ax.text(i, -max(bar_heights)*0.02, label, ha='center', va='center', 
-                color='black', fontsize=10, fontweight='normal', rotation=45)
+                color='black', fontsize=9, fontweight='normal', rotation=45)
+    
     ax.set_xticks([])
-    ax.set_yticks(np.linspace(0, max(bar_heights), 5))
+    ax.set_yticks(np.linspace(0, max(bar_heights), 6))
     ax.set_xlim(-0.5, len(bar_heights) - 0.5)
     ax.set_ylim(-max(bar_heights)*0.1, max(bar_heights) + max(bar_heights)*0.2)
+    
+    # Remove spines for cleaner look
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['bottom'].set_visible(False)
     ax.spines['left'].set_visible(False)
-    ax.set_ylabel('Percentage of Single Base Modifications', fontsize=14)
+    
+    # Add grid with seaborn styling
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax.set_axisbelow(True)
+    
+    # Set labels and title with improved styling
+    ax.set_ylabel('Percentage of Single Base Modifications', fontsize=14, fontweight='bold')
+    
     # Title with age and filename
     age = row['Age'] if 'Age' in row else 'N/A'
     filename = row['FileName'] if 'FileName' in row else 'sample'
     title = f"Mutational Signatures by Position and Strand Context\nFile: {filename} | Age: {age} years"
     ax.set_title(title, fontsize=18, fontweight='bold', pad=30)
-    ax.yaxis.grid(True, linestyle='--', alpha=0.5)
+    
+    # Improve layout
     plt.tight_layout(rect=[0, 0.15, 1, 0.95])
-    plt.savefig(output_path, dpi=200, bbox_inches='tight')
+    
+    # Save with high quality
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
 def plot_mutational_signatures(csv_path):
+    # Set global seaborn style
+    sns.set_theme(style="whitegrid", font_scale=1.1)
+    
     df = pd.read_csv(csv_path)
     mutation_types = [
         ('C>A', '#3DB7E9'),

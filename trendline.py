@@ -42,7 +42,7 @@ def plot_trendlines(data, output_path):
             # Add trendline
             if len(plot_data) > 1:
                 sns.regplot(data=plot_data, x='Age', y=var, ax=ax, 
-                          scatter=False, line_kws={'color': 'red', 'linestyle': '--'})
+                          scatter=False, line_kws={'color': 'blue', 'linestyle': '--'})
             
             ax.set_title(title, fontweight='bold')
             ax.set_xlabel('Age')

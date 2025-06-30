@@ -79,12 +79,12 @@ def plot_mutational_signatures(csv_path):
     
     df = pd.read_csv(csv_path)
     mutation_types = [
-        ('C>A', '#3DB7E9'),
-        ('C>G', '#000000'),
-        ('C>T', '#E71D25'),
-        ('T>A', '#BEBEBE'),
-        ('T>C', '#94C849'),
-        ('T>G', '#F6C4C4'),
+        ('C>A', 'blue'),
+        ('C>G', 'black'),
+        ('C>T', 'red'),
+        ('G>A', 'gray'),
+        ('G>C', 'green'),
+        ('G>T', 'pink'),
     ]
     mutation_columns = {
         'C>A': {
@@ -99,14 +99,17 @@ def plot_mutational_signatures(csv_path):
             'C-strand': ['C_T_c1', 'C_T_c2', 'C_T_c3'],
             'G-strand': ['G_A_g1', 'G_A_g2', 'G_A_g3']
         },
-        'T>A': {
-            'T-strand': ['T_A_t1', 'T_A_t2', 'T_A_t3']
+        'G>A': {
+            'G-strand': ['G_A_g1', 'G_A_g2', 'G_A_g3'],
+            'C-strand': ['C_G_c1', 'C_G_c2', 'C_G_c3']
         },
-        'T>C': {
-            'T-strand': ['T_C_t1', 'T_C_t2', 'T_C_t3']
+        'G>C': {
+            'G-strand': ['G_C_g1', 'G_C_g2', 'G_C_g3'],
+            'C-strand': ['C_T_c1', 'C_T_c2', 'C_T_c3']
         },
-        'T>G': {
-            'T-strand': ['T_G_t1', 'T_G_t2', 'T_G_t3']
+        'G>T': {
+            'G-strand': ['G_T_g1', 'G_T_g2', 'G_T_g3'],
+            'C-strand': ['C_A_c1', 'C_A_c2', 'C_A_c3']
         }
     }
     # Ensure plots directory exists

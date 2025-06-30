@@ -170,3 +170,7 @@ open mutational_signatures.png
 - **No FASTQ files found**: Ensure files are in the `greider_data/` directory
 - **Age data not found**: Check that `greider_methods_table_s2.csv` exists and has correct column names
 - **Filename mismatch**: Convert underscores to dots in the age data CSV to match FASTQ filenames
+
+## Next Steps
+
+- Characterize super healthy indiviudals with low mutations/high age and see what their relative mutation rates are across positions

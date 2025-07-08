@@ -1,6 +1,7 @@
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.stats import spearmanr
 
 def plot_trendlines(data, output_path):
     # Set up the plotting style
@@ -56,13 +57,57 @@ def plot_trendlines(data, output_path):
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
+def plot_spearman_correlations(data, output_path):
+    sns.set_style("whitegrid")
+    sns.set_palette("husl")
+    
+    variables = [
+        'total_mutations_over_total_g_per_1k',
+        'C_A_c1_per_1k',
+        'C_A_c2_per_1k',
+        'C_A_c3_per_1k'
+    ]
+    titles = [
+        'Total Mutations per 1000bp',
+        'C < A at Position 1 Mutation Rate per 1000bp',
+        'C < A at Position 2 Mutation Rate per 1000bp',
+        'C < A at Position 3 Mutation Rate per 1000bp'
+    ]
+    
+    fig, axes = plt.subplots(2, 2, figsize=(20, 12))
+    fig.suptitle("Spearman's Rank Correlation: Mutation Rates vs Age", fontsize=16, fontweight='bold')
+    
+    for i, (var, title) in enumerate(zip(variables, titles)):
+        row = i // 2
+        col = i % 2
+        ax = axes[row, col]
+        plot_data = data.dropna(subset=['Age', var])
+        if len(plot_data) > 1:
+            # Calculate Spearman's rank correlation
+            corr, pval = spearmanr(plot_data['Age'], plot_data[var])
+            # Scatter plot
+            sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.6)
+            ax.set_title(f"{title}\nSpearman r = {corr:.2f}, p = {pval:.2g}", fontweight='bold')
+            ax.set_xlabel('Age')
+            ax.set_ylabel('Mutations per 1000bp')
+        else:
+            ax.text(0.5, 0.5, 'No data available', ha='center', va='center', 
+                    transform=ax.transAxes, fontsize=12)
+            ax.set_title(title, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
+
 def main():
     data = pd.read_csv("telomere_analysis.csv")
     
     # Plot the trendlines
     plot_trendlines(data, "trendline.png")
+    # Plot the Spearman correlation graph
+    plot_spearman_correlations(data, "spearman_correlation.png")
     
     print("Trendline plot saved as 'trendline.png'")
+    print("Spearman correlation plot saved as 'spearman_correlation.png'")
 
 if __name__ == "__main__":
     main()

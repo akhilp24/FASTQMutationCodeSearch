@@ -36,8 +36,6 @@ def load_age_data():
     with open('greider_methods_table_s2.csv', 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            # Convert the filename format to match our FASTQ files
-            # e.g., "JH47.F86_NB70" -> "JH47.F86.NB70"
             fastq_name = row['fastq file name'].replace('_', '.')
             age_data[fastq_name] = row['Age (Years)']
     return age_data
@@ -50,7 +48,6 @@ def get_fastq_files(directory: str):
     return sorted(fastq_files)  # Sort for consistent ordering
 
 def main():
-    # Get all FASTQ files from the greider_data directory
     fastq_files = get_fastq_files("greider_data_download")
     
     if not fastq_files:

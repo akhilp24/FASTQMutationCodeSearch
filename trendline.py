@@ -83,9 +83,7 @@ def plot_spearman_correlations(data, output_path):
         ax = axes[row, col]
         plot_data = data.dropna(subset=['Age', var])
         if len(plot_data) > 1:
-            # Calculate Spearman's rank correlation
             corr, pval = spearmanr(plot_data['Age'], plot_data[var])
-            # Scatter plot
             sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.6)
             ax.set_title(f"{title}\nSpearman r = {corr:.2f}, p = {pval:.2g}", fontweight='bold')
             ax.set_xlabel('Age')

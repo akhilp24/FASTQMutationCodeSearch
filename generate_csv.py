@@ -186,9 +186,10 @@ def main():
                     key = f'{mut}_t{i}'
                     row[f'{mut.replace(">", "_")}_t{i}'] = counts.get(key, 0)
                     row[f'{mut.replace(">", "_")}_t{i}_per_1k'] = per_1k(counts.get(key, 0), g_strand_total)  # or t_strand_total if available
+            
             # Total mutations (sum all mutation counts)
             total_mutations = sum(counts[k] for k in counts if k not in ['c_strand', 'g_strand'])
-            row['total_mutations_over_total_g_per_1k'] = per_1k(total_mutations, g_strand_total)
+            row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k(total_mutations, g_strand_total)
             writer.writerow(row)
             
             # Print to console as well

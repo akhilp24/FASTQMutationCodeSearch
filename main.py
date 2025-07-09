@@ -40,6 +40,16 @@ def load_age_data():
             age_data[fastq_name] = row['Age (Years)']
     return age_data
 
+def load_length_data():
+    """Load length data from greider_methods_table_s2.csv."""
+    length_data = {}
+    with open('greider_methods_table_s2.csv', 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            fastq_name = row['fastq file name'].replace('_', '.')
+            length_data[fastq_name] = row['Mean Telomere Length (bps)']
+    return length_data
+
 def get_fastq_files(directory: str):
     """Get all FASTQ files in the given directory."""
     # Look for both .fastq and .fastq.gz files
@@ -56,6 +66,7 @@ def main():
     
     # Load age data
     age_data = load_age_data()
+    length_data = load_length_data()
     
     # Expanded patterns for all 6 mutation types at 3 positions each (G-strand context)
     patterns = {
@@ -97,7 +108,7 @@ def main():
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
         # Define CSV headers
         fieldnames = [
-            'FileName', 'Age', '2x_cstrand', '2xg_strand',
+            'FileName', 'Age', 'Telomere_Length', '2x_cstrand', '2xg_strand',
             # G-strand mutation counts
             'G_A_g1', 'G_A_g2', 'G_A_g3',
             'G_C_g1', 'G_C_g2', 'G_C_g3',
@@ -144,6 +155,7 @@ def main():
             filename = os.path.basename(file_path)
             filename_base = filename.replace('.fastq', '').replace('.gz', '')
             age = age_data.get(filename_base, '')
+            length = length_data.get(filename_base, '')
             g_strand_total = counts['g_strand']
             c_strand_total = counts['c_strand']
             # Calculate per 1k rates for each mutation type
@@ -152,6 +164,7 @@ def main():
             row = {
                 'FileName': filename,
                 'Age': age,
+                'Telomere_Length': length,
                 '2x_cstrand': c_strand_total,
                 '2xg_strand': g_strand_total,
             }
@@ -181,6 +194,7 @@ def main():
             # Print to console as well
             print(f"\nProcessing {filename}:")
             print(f"Age: {age}")
+            print(f"Telomere Length: {length}")
             print(f"2x cstrand total: {c_strand_total}")
             print(f"2x g strand total: {g_strand_total}")
 

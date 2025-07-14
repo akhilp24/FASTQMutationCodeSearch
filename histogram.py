@@ -8,11 +8,9 @@ def plot_histograms(data, output_path):
     sns.set_style("whitegrid")
     sns.set_palette("husl")
     
-    # Create a 2x2 subplot layout
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))
     fig.suptitle('Mutation Rates by Age Groups (10-year bins)', fontsize=16, fontweight='bold')
     
-    # Define the variables to plot (same as trendline.py)
     variables = [
         'total_mutations_over_total_g_strand_2xrepeats_per_1k',
         'G_T_g1_per_1k',  # pos1 mutation rate
@@ -27,7 +25,6 @@ def plot_histograms(data, output_path):
         'G < T at Position 3 Mutation Rate per 1000bp'
     ]
     
-    # Plot each variable
     for i, (var, title) in enumerate(zip(variables, titles)):
         row = i // 2
         col = i % 2
@@ -63,13 +60,11 @@ def plot_histograms(data, output_path):
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
-def main():
+def plot_histograms_main():
     data = pd.read_csv("telomere_analysis.csv")
-    
     # Plot the histograms
     plot_histograms(data, "histogram.png")
-    
     print("Histogram plot saved as 'histogram.png'")
 
 if __name__ == "__main__":
-    main()
+    plot_histograms_main()

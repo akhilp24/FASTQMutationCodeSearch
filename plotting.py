@@ -121,10 +121,9 @@ def plot_mutational_signatures(csv_path):
         output_path = os.path.join('plots', f'{filename_base}.png')
         plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path)
 
+def plot_mutational_signatures_main():
+    plot_mutational_signatures('telomere_analysis.csv')
+    print("Mutational signature plots saved in 'plots/' directory")
+
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) < 2:
-        print("Usage: python plotting.py <csv_path>")
-        sys.exit(1)
-    csv_path = sys.argv[1]
-    plot_mutational_signatures(csv_path)
+    plot_mutational_signatures_main()

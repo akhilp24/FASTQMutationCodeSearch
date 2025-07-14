@@ -57,7 +57,7 @@ def get_fastq_files(directory: str):
     fastq_files.extend(glob.glob(os.path.join(directory, "*.fastq.gz")))
     return sorted(fastq_files)  # Sort for consistent ordering
 
-def main():
+def generate_csv():
     fastq_files = get_fastq_files("greider_data_download")
     
     if not fastq_files:
@@ -200,4 +200,4 @@ def main():
             print(f"2x g strand total: {g_strand_total}")
 
 if __name__ == "__main__":
-    main()
+    generate_csv()

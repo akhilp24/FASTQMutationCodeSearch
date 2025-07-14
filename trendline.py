@@ -96,16 +96,14 @@ def plot_spearman_correlations(data, output_path):
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
-def main():
+def plot_trendlines_main():
     data = pd.read_csv("telomere_analysis.csv")
-    
     # Plot the trendlines
     plot_trendlines(data, "trendline.png")
     # Plot the Spearman correlation graph
     plot_spearman_correlations(data, "spearman_correlation.png")
-    
     print("Trendline plot saved as 'trendline.png'")
     print("Spearman correlation plot saved as 'spearman_correlation.png'")
 
 if __name__ == "__main__":
-    main()
+    plot_trendlines_main()

@@ -57,11 +57,11 @@ def get_fastq_files(directory: str):
     fastq_files.extend(glob.glob(os.path.join(directory, "*.fastq.gz")))
     return sorted(fastq_files)  # Sort for consistent ordering
 
-def generate_csv():
-    fastq_files = get_fastq_files("greider_data_download")
+def generate_csv(data_dir: str):
+    fastq_files = get_fastq_files(data_dir)
     
     if not fastq_files:
-        print("No FASTQ files found in greider_data directory")
+        print(f"No FASTQ files found in {data_dir} directory")
         return
     
     # Load age data

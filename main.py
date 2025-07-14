@@ -3,7 +3,8 @@ import sys
 # Step 1: Generate CSV
 print("[1/4] Generating telomere_analysis.csv ...")
 from generate_csv import generate_csv
-generate_csv()
+data_dir = "initial_test_data"
+generate_csv(data_dir)
 
 # Step 2: Plot histograms
 print("[2/4] Plotting histograms ...")

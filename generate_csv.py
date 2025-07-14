@@ -134,7 +134,7 @@ def generate_csv(data_dir: str):
             'T_C_t1_per_1k', 'T_C_t2_per_1k', 'T_C_t3_per_1k',
             'T_G_t1_per_1k', 'T_G_t2_per_1k', 'T_G_t3_per_1k',
             # Totals
-            'total_mutations_over_total_g_per_1k'
+            'total_mutations_over_total_g_strand_2xrepeats_per_1k'
         ]
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()

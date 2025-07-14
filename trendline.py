@@ -62,7 +62,7 @@ def plot_spearman_correlations(data, output_path):
     sns.set_palette("husl")
     
     variables = [
-        'total_mutations_over_total_g_per_1k',
+        'total_mutations_over_total_g_strand_2xrepeats_per_1k',
         'G_T_g1_per_1k',
         'G_T_g2_per_1k',
         'G_T_g3_per_1k'

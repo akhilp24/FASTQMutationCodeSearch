@@ -27,7 +27,6 @@ def get_reverse_complement(sequence: str) -> str:
     return ''.join(complement[base] for base in reversed(sequence))
 
 def count_patterns(sequence: str, pattern: str) -> int:
-    """Count occurrences of a pattern in a sequence."""
     return sequence.count(pattern)
 
 def load_age_data():
@@ -68,11 +67,10 @@ def generate_csv(data_dir: str):
     age_data = load_age_data()
     length_data = load_length_data()
     
-    # Expanded patterns for all 6 mutation types at 3 positions each (G-strand context)
     patterns = {
-        'c_strand': "CCCTAACCCTAA",  # C-strand pattern
-        'g_strand': "GGGTTAGGGTTA",  # G-strand pattern
-        # G-strand mutations (positions 1, 2, 3)
+        'c_strand': "CCCTAACCCTAA",
+        'g_strand': "GGGTTAGGGTTA",
+        'g_strand_mutations': {
         'G>A_g1': "GGGTTAAGGTTA",
         'G>A_g2': "GGGTTAGAGTTA",
         'G>A_g3': "GGGTTAGGATTA",
@@ -91,7 +89,8 @@ def generate_csv(data_dir: str):
         'A>T_a1': "GGGTTAGGGTTT",
         'A>G_a1': "GGGTTAGGGTTG",
         'A>C_a1': "GGGTTAGGGTTC",
-        # C-strand mutations
+        },
+        'c_strand_mutations': {
         'C>A_c1': "CCCTAAACCTAA",
         'C>A_c2': "CCCTAACACTAA",
         'C>A_c3': "CCCTAACCATAA",
@@ -101,41 +100,35 @@ def generate_csv(data_dir: str):
         'C>T_c1': "CCCTAATCCTAA",
         'C>T_c2': "CCCTAACTCTAA",
         'C>T_c3': "CCCTAACCTTAA",
-        
+        'T>A_t1': "CCCTAACCCAAA",
+        'T>C_t1': "CCCTAACCCCAA",
+        'T>G_t1': "CCCTAACCCGAA",
+        'A>T_a1': "CCCTAACCCTTA",
+        'A>T_a2': "CCCTAACCCTAT",
+        'A>G_a1': "CCCTAACCCTGA",
+        'A>G_a2': "CCCTAACCCTAG",
+        'A>C_a1': "CCCTAACCCTCA",
+        'A>C_a2': "CCCTAACCCTAC",
+        },
     }
     
     # Create CSV file
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
         # Define CSV headers
         fieldnames = [
-            'FileName', 'Age', 'Telomere_Length', '2x_cstrand', '2xg_strand',
-            # G-strand mutation counts
-            'G_A_g1', 'G_A_g2', 'G_A_g3',
-            'G_C_g1', 'G_C_g2', 'G_C_g3',
-            'G_T_g1', 'G_T_g2', 'G_T_g3',
-            # C-strand mutation counts
-            'C_A_c1', 'C_A_c2', 'C_A_c3',
-            'C_G_c1', 'C_G_c2', 'C_G_c3',
-            'C_T_c1', 'C_T_c2', 'C_T_c3',
-            # T-strand mutation counts
-            'T_A_t1', 'T_A_t2', 'T_A_t3',
-            'T_C_t1', 'T_C_t2', 'T_C_t3',
-            'T_G_t1', 'T_G_t2', 'T_G_t3',
-            # Normalized rates (per 1k g_strand)
-            'G_A_g1_per_1k', 'G_A_g2_per_1k', 'G_A_g3_per_1k',
-            'G_C_g1_per_1k', 'G_C_g2_per_1k', 'G_C_g3_per_1k',
-            'G_T_g1_per_1k', 'G_T_g2_per_1k', 'G_T_g3_per_1k',
-            # Normalized rates (per 1k c_strand)
-            'C_A_c1_per_1k', 'C_A_c2_per_1k', 'C_A_c3_per_1k',
-            'C_G_c1_per_1k', 'C_G_c2_per_1k', 'C_G_c3_per_1k',
-            'C_T_c1_per_1k', 'C_T_c2_per_1k', 'C_T_c3_per_1k',
-            # Normalized rates (per 1k t_strand, if needed)
-            'T_A_t1_per_1k', 'T_A_t2_per_1k', 'T_A_t3_per_1k',
-            'T_C_t1_per_1k', 'T_C_t2_per_1k', 'T_C_t3_per_1k',
-            'T_G_t1_per_1k', 'T_G_t2_per_1k', 'T_G_t3_per_1k',
-            # Totals
-            'total_mutations_over_total_g_strand_2xrepeats_per_1k'
+            'FileName', 'Age', 'Telomere_Length',
+            'c_strand', 'g_strand',
         ]
+        # Add all sub-pattern keys for mutation groups
+        mutation_keys = []
+        for group in ['g_strand_mutations', 'c_strand_mutations']:
+            for subkey in patterns[group].keys():
+                mutation_keys.append(f"{group}_{subkey}")
+        fieldnames.extend(mutation_keys)
+        # Add normalized rate fields for each mutation key
+        fieldnames.extend([f"{k}_per_1k" for k in mutation_keys])
+        # Add total mutations field at the end
+        fieldnames.append('total_mutations_over_total_g_strand_2xrepeats_per_1k')
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         
@@ -147,10 +140,10 @@ def generate_csv(data_dir: str):
                 counts['c_strand'] += count_patterns(sequence, patterns['c_strand'])
                 # Count g-strand in forward direction only
                 counts['g_strand'] += count_patterns(sequence, patterns['g_strand'])
-                # Count all mutation patterns
-                for name, pattern in patterns.items():
-                    if name not in ['c_strand', 'g_strand']:
-                        counts[name] += count_patterns(sequence, pattern)
+                # Count all mutation sub-patterns
+                for group in ['g_strand_mutations', 'c_strand_mutations']:
+                    for subkey, subpattern in patterns[group].items():
+                        counts[f"{group}_{subkey}"] += count_patterns(sequence, subpattern)
             
             filename = os.path.basename(file_path)
             filename_base = filename.replace('.fastq', '').replace('.gz', '')
@@ -166,30 +159,16 @@ def generate_csv(data_dir: str):
                 'FileName': filename,
                 'Age': age,
                 'Telomere_Length': length,
-                '2x_cstrand': c_strand_total,
-                '2xg_strand': g_strand_total,
+                'c_strand': c_strand_total,
+                'g_strand': g_strand_total,
             }
-            # G-strand
-            for mut in ['G>A', 'G>C', 'G>T']:
-                for i in range(1, 4):
-                    key = f'{mut}_g{i}'
-                    row[f'{mut.replace(">", "_")}_g{i}'] = counts.get(key, 0)
-                    row[f'{mut.replace(">", "_")}_g{i}_per_1k'] = per_1k(counts.get(key, 0), g_strand_total)
-            # C-strand
-            for mut in ['C>A', 'C>G', 'C>T']:
-                for i in range(1, 4):
-                    key = f'{mut}_c{i}'
-                    row[f'{mut.replace(">", "_")}_c{i}'] = counts.get(key, 0)
-                    row[f'{mut.replace(">", "_")}_c{i}_per_1k'] = per_1k(counts.get(key, 0), c_strand_total)
-            # T-strand (if needed, else can be omitted)
-            for mut in ['T>A', 'T>C', 'T>G']:
-                for i in range(1, 4):
-                    key = f'{mut}_t{i}'
-                    row[f'{mut.replace(">", "_")}_t{i}'] = counts.get(key, 0)
-                    row[f'{mut.replace(">", "_")}_t{i}_per_1k'] = per_1k(counts.get(key, 0), g_strand_total)  # or t_strand_total if available
+            # Add all mutation sub-pattern counts
+            for k in mutation_keys:
+                row[k] = counts.get(k, 0)
+                row[f"{k}_per_1k"] = per_1k(counts.get(k, 0), g_strand_total)
             
             # Total mutations (sum all mutation counts)
-            total_mutations = sum(counts[k] for k in counts if k not in ['c_strand', 'g_strand'])
+            total_mutations = sum(counts[k] for k in mutation_keys)
             row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k(total_mutations, g_strand_total)
             writer.writerow(row)
             
@@ -199,6 +178,8 @@ def generate_csv(data_dir: str):
             print(f"Telomere Length: {length}")
             print(f"2x cstrand total: {c_strand_total}")
             print(f"2x g strand total: {g_strand_total}")
+            if counts['g_strand'] == 0 and counts['c_strand'] == 0:
+                print(f"Example sequence from {filename}: {sequence}")
 
 if __name__ == "__main__":
     generate_csv()

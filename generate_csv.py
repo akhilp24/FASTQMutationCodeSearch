@@ -82,26 +82,26 @@ def generate_csv(data_dir: str):
         'G>T_g1': "GGGTTATGGTTA",
         'G>T_g2': "GGGTTAGTGTTA",
         'G>T_g3': "GGGTTAGGTTTA",
-        # C-strand mutations (positions 1, 2, 3)
-        'C>A_c1': "CCATAACCCTAA",
-        'C>A_c2': "CCCTAAACCTAA",
-        'C>A_c3': "CCCTAACCATAA",
-        'C>G_c1': "CCGTAACCCTAA",
-        'C>G_c2': "CCCTAGGCCTAA",
-        'C>G_c3': "CCCTAACCCTGA",
-        'C>T_c1': "CCTTAACCCTAA",
-        'C>T_c2': "CCCTATTCCTAA",
-        'C>T_c3': "CCCTAACCCTTA",
-        # T-strand mutations (positions 1, 2, 3)
-        'T>A_t1': "GGGTAAGGGTTA",
-        'T>A_t2': "GGGTTAAAGTTA",
-        'T>A_t3': "GGGTTAGGGAAA",
+        'T>A_t1': "GGGTTAGGGATA",
+        'T>A_t2': "GGGTTAGGGTAA",
         'T>C_t1': "GGGTCAGGGTTA",
         'T>C_t2': "GGGTTACGGTTA",
-        'T>C_t3': "GGGTTAGGGTCA",
         'T>G_t1': "GGGTGAGGGTTA",
         'T>G_t2': "GGGTTAGGGGTA",
-        'T>G_t3': "GGGTTAGGGGTA",
+        'A>T_a1': "GGGTTAGGGTTT",
+        'A>G_a1': "GGGTTAGGGTTG",
+        'A>C_a1': "GGGTTAGGGTTC",
+        # C-strand mutations
+        'C>A_c1': "CCCTAAACCTAA",
+        'C>A_c2': "CCCTAACACTAA",
+        'C>A_c3': "CCCTAACCATAA",
+        'C>G_c1': "CCCTAAGCCTAA",
+        'C>G_c2': "CCCTAACGCTAA",
+        'C>G_c3': "CCCTAACCGTAA",
+        'C>T_c1': "CCCTAATCCTAA",
+        'C>T_c2': "CCCTAACTCTAA",
+        'C>T_c3': "CCCTAACCTTAA",
+        
     }
     
     # Create CSV file
@@ -158,6 +158,7 @@ def generate_csv(data_dir: str):
             length = length_data.get(filename_base, '')
             g_strand_total = counts['g_strand']
             c_strand_total = counts['c_strand']
+
             # Calculate per 1k rates for each mutation type
             def per_1k(val, total):
                 return (val / total) * 1000 if total > 0 else 0

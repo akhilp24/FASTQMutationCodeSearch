@@ -165,7 +165,13 @@ def generate_csv(data_dir: str):
 
             for k in mutation_keys:
                 row[k] = counts.get(k, 0)
-                row[f"{k}_per_1k"] = per_1k(counts.get(k, 0), g_strand_total)
+                if k.startswith('g_strand_mutations'):
+                    norm_total = g_strand_total
+                elif k.startswith('c_strand_mutations'):
+                    norm_total = c_strand_total
+                else:
+                    norm_total = g_strand_total  # fallback, should not occur
+                row[f"{k}_per_1k"] = per_1k(counts.get(k, 0), norm_total)
             
             # Total mutations (sum all mutation counts)
             total_mutations = sum(counts[k] for k in mutation_keys)

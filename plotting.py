@@ -4,6 +4,8 @@ import numpy as np
 import os
 import seaborn as sns
 
+import numbers
+
 def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path):
     # Set seaborn style for better-looking plots
     sns.set_style("whitegrid")
@@ -224,7 +226,142 @@ def plot_spearman_with_age_main():
     plot_spearman_with_age('telomere_analysis.csv')
     print("Spearman plots saved in 'spearman's plots/' directory")
 
+def plot_mutation_r_heatmap(csv_path, target_col='Age'):
+    """
+    Plot a heatmap of Spearman r values between each normalized mutation column (per_1k/per1k) and the target column (e.g., Age),
+    as well as the total mutation count column if present. Also plot a clustered heatmap of these values for all samples.
+    """
+    import scipy.stats as stats
+    # Read data
+    df = pd.read_csv(csv_path)
+    # Only keep columns with numeric data and drop rows with missing target
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    if target_col not in numeric_cols:
+        print(f"No '{target_col}' column found in the data.")
+        return
+    # Only use columns with 'per_1k' or 'per1k' in the name, plus total mutation count if present
+    mutation_cols = [col for col in numeric_cols if ('per_1k' in col or 'per1k' in col)]
+    total_mut_col = None
+    for col in numeric_cols:
+        if 'total_mutation' in col and col not in mutation_cols:
+            total_mut_col = col
+            break
+    if total_mut_col:
+        mutation_cols.append(total_mut_col)
+    if not mutation_cols:
+        print("No normalized 'per_1k' or 'per1k' mutation columns found.")
+        return
+    df = df.dropna(subset=[target_col])
+    # Calculate Spearman r for each mutation column
+    r_values = []
+    for col in mutation_cols:
+        sub_df = df.dropna(subset=[col])
+        if sub_df.shape[0] < 2:
+            r = float('nan')
+        else:
+            r, _ = stats.spearmanr(sub_df[col], sub_df[target_col])
+        r_values.append(r)
+    # Create DataFrame for heatmap
+    r_df = pd.DataFrame({'Mutation': mutation_cols, 'Spearman_r': r_values})
+    r_df = r_df.set_index('Mutation')
+    # Plot heatmap of r values
+    plt.figure(figsize=(max(8, len(mutation_cols) * 0.4), 2.5))
+    sns.heatmap(r_df.T, annot=True, cmap='coolwarm', center=0, cbar_kws={'label': "Spearman's r"})
+    plt.title(f"Spearman r values: Normalized Mutations vs {target_col}")
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+    output_dir = "spearman's plots"
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, f"mutation_r_heatmap_vs_{target_col}.png")
+    plt.savefig(output_path, dpi=200)
+    plt.close()
+    print(f"Mutation r heatmap saved as {output_path}")
+
+    # Clustered heatmap of normalized mutation values for all samples
+    if len(mutation_cols) > 1:
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sns.clustermap(df[mutation_cols], cmap='viridis', standard_scale=1, yticklabels=False)
+        plt.suptitle('Clustered Heatmap of Normalized Mutation Values (Z-score by column)', y=1.02)
+        plt.tight_layout()
+        output_path2 = os.path.join(output_dir, f"mutation_value_clustermap.png")
+        plt.savefig(output_path2, dpi=200)
+        plt.close()
+        print(f"Clustered mutation value heatmap saved as {output_path2}")
+
+
+def plot_mutation_r_heatmap_main():
+    plot_mutation_r_heatmap('telomere_analysis.csv', target_col='Age')
+
+def plot_pairwise_r_heatmap(csv_path):
+    """
+    Plot a heatmap of pairwise Spearman r values between all relevant columns (per_1k/per1k, total mutation count, Age, and telomere columns).
+    The diagonal is masked (crossed out).
+    """
+    import scipy.stats as stats
+    # Read data
+    df = pd.read_csv(csv_path)
+    # Only use columns with 'per_1k' or 'per1k' in the name, plus total mutation count if present
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    mutation_cols = [col for col in numeric_cols if ('per_1k' in col or 'per1k' in col)]
+    total_mut_col = None
+    for col in numeric_cols:
+        if 'total_mutation' in col and col not in mutation_cols:
+            total_mut_col = col
+            break
+    if total_mut_col:
+        mutation_cols.append(total_mut_col)
+    # Add Age if present
+    if 'Age' in df.columns and 'Age' in numeric_cols and 'Age' not in mutation_cols:
+        mutation_cols.append('Age')
+    # Add telomere columns (case-insensitive)
+    telomere_cols = [col for col in df.columns if 'telomere' in col.lower() and col in numeric_cols and col not in mutation_cols]
+    mutation_cols.extend(telomere_cols)
+    if not mutation_cols:
+        print("No relevant columns found for pairwise heatmap.")
+        return
+    # Compute pairwise Spearman r matrix
+    n = len(mutation_cols)
+    r_matrix = np.zeros((n, n))
+    for i, col1 in enumerate(mutation_cols):
+        for j, col2 in enumerate(mutation_cols):
+            # Drop rows with missing values in either column
+            sub_df = df[[col1, col2]].dropna()
+            if sub_df.shape[0] < 2:
+                r = np.nan
+            else:
+                r_val = stats.spearmanr(sub_df[col1], sub_df[col2])[0]
+                # Ensure r_val is a scalar float
+                if isinstance(r_val, numbers.Number) and not isinstance(r_val, (list, tuple, np.ndarray)):
+                    r = float(r_val)
+                else:
+                    r = np.nan
+            r_matrix[i, j] = r
+    # Mask the diagonal
+    mask = np.eye(n, dtype=bool)
+    # Plot heatmap
+    plt.figure(figsize=(max(8, n * 0.5), max(6, n * 0.5)))
+    ax = sns.heatmap(r_matrix, annot=True, fmt=".2f", cmap="coolwarm", center=0, mask=mask,
+                     xticklabels=mutation_cols, yticklabels=mutation_cols, cbar_kws={'label': "Spearman's r"})
+    # Cross out the diagonal
+    for i in range(n):
+        ax.add_patch(plt.Rectangle((i, i), 1, 1, fill=False, edgecolor='black', lw=2, hatch='xx'))
+    plt.title("Pairwise Spearman r Heatmap (Normalized Mutations, Age, Telomere)")
+    plt.tight_layout()
+    output_dir = "spearman's plots"
+    os.makedirs(output_dir, exist_ok=True)
+    output_path = os.path.join(output_dir, "pairwise_mutation_r_heatmap.png")
+    plt.savefig(output_path, dpi=200)
+    plt.close()
+    print(f"Pairwise mutation r heatmap saved as {output_path}")
+
+def plot_pairwise_r_heatmap_main():
+    plot_pairwise_r_heatmap('telomere_analysis.csv')
+
 if __name__ == "__main__":
     plot_mutational_signatures_main()
     plot_spearman_with_age_main()
     plot_composite_score_main()
+    plot_mutation_r_heatmap_main()
+    plot_pairwise_r_heatmap_main()

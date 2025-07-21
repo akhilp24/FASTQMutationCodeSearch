@@ -153,6 +153,7 @@ def plot_spearman_with_age(csv_path):
             continue  # Not enough data to plot
         x = sub_df['Age']
         y = sub_df[col]
+        
         # Calculate Spearman correlation
         corr, pval = stats.spearmanr(x, y)
         spearman_results.append({'Column': col, 'Spearman_r': corr, 'p_value': pval})
@@ -278,17 +279,18 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age'):
     print(f"Mutation r heatmap saved as {output_path}")
 
     # Clustered heatmap of normalized mutation values for all samples
-    if len(mutation_cols) > 1:
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            sns.clustermap(df[mutation_cols], cmap='viridis', standard_scale=1, yticklabels=False)
-        plt.suptitle('Clustered Heatmap of Normalized Mutation Values (Z-score by column)', y=1.02)
-        plt.tight_layout()
-        output_path2 = os.path.join(output_dir, f"mutation_value_clustermap.png")
-        plt.savefig(output_path2, dpi=200)
-        plt.close()
-        print(f"Clustered mutation value heatmap saved as {output_path2}")
+    # (Removed as per user request)
+    # if len(mutation_cols) > 1:
+    #     import warnings
+    #     with warnings.catch_warnings():
+    #         warnings.simplefilter("ignore")
+    #         sns.clustermap(df[mutation_cols], cmap='viridis', standard_scale=1, yticklabels=False)
+    #     plt.suptitle('Clustered Heatmap of Normalized Mutation Values (Z-score by column)', y=1.02)
+    #     plt.tight_layout()
+    #     output_path2 = os.path.join(output_dir, f"mutation_value_clustermap.png")
+    #     plt.savefig(output_path2, dpi=200)
+    #     plt.close()
+    #     print(f"Clustered mutation value heatmap saved as {output_path2}")
 
 
 def plot_mutation_r_heatmap_main():
@@ -340,14 +342,28 @@ def plot_pairwise_r_heatmap(csv_path):
             r_matrix[i, j] = r
     # Mask the diagonal
     mask = np.eye(n, dtype=bool)
-    # Plot heatmap
-    plt.figure(figsize=(max(8, n * 0.5), max(6, n * 0.5)))
-    ax = sns.heatmap(r_matrix, annot=True, fmt=".2f", cmap="coolwarm", center=0, mask=mask,
-                     xticklabels=mutation_cols, yticklabels=mutation_cols, cbar_kws={'label': "Spearman's r"})
+    # Plot heatmap with improved readability
+    fig_width = max(10, n * 0.7)
+    fig_height = max(8, n * 0.7)
+    plt.figure(figsize=(fig_width, fig_height))
+    ax = sns.heatmap(
+        r_matrix,
+        annot=True,
+        fmt=".2f",
+        cmap="coolwarm",
+        center=0,
+        mask=mask,
+        xticklabels=mutation_cols,
+        yticklabels=mutation_cols,
+        cbar_kws={'label': "Spearman's r"},
+        annot_kws={"size": 8}
+    )
     # Cross out the diagonal
     for i in range(n):
         ax.add_patch(plt.Rectangle((i, i), 1, 1, fill=False, edgecolor='black', lw=2, hatch='xx'))
-    plt.title("Pairwise Spearman r Heatmap (Normalized Mutations, Age, Telomere)")
+    plt.title("Pairwise Spearman r Heatmap (Normalized Mutations, Age, Telomere)", fontsize=14)
+    plt.xticks(rotation=45, ha='right', fontsize=9)
+    plt.yticks(fontsize=9)
     plt.tight_layout()
     output_dir = "spearman's plots"
     os.makedirs(output_dir, exist_ok=True)

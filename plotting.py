@@ -88,28 +88,28 @@ def plot_mutational_signatures(csv_path):
     ]
     mutation_columns = {
         'C>A': {
-            'C-strand': ['C_A_c1', 'C_A_c2', 'C_A_c3'],
-            'G-strand': ['G_T_g1', 'G_T_g2', 'G_T_g3']
+            'C-strand': ['c_strand_mutations_C>A_c1', 'c_strand_mutations_C>A_c2', 'c_strand_mutations_C>A_c3'],
+            'G-strand': ['g_strand_mutations_G>T_g1', 'g_strand_mutations_G>T_g2', 'g_strand_mutations_G>T_g3']
         },
         'C>G': {
-            'C-strand': ['C_G_c1', 'C_G_c2', 'C_G_c3'],
-            'G-strand': ['G_C_g1', 'G_C_g2', 'G_C_g3']
+            'C-strand': ['c_strand_mutations_C>G_c1', 'c_strand_mutations_C>G_c2', 'c_strand_mutations_C>G_c3'],
+            'G-strand': ['g_strand_mutations_G>C_g1', 'g_strand_mutations_G>C_g2', 'g_strand_mutations_G>C_g3']
         },
         'C>T': {
-            'C-strand': ['C_T_c1', 'C_T_c2', 'C_T_c3'],
-            'G-strand': ['G_A_g1', 'G_A_g2', 'G_A_g3']
+            'C-strand': ['c_strand_mutations_C>T_c1', 'c_strand_mutations_C>T_c2', 'c_strand_mutations_C>T_c3'],
+            'G-strand': ['g_strand_mutations_G>A_g1', 'g_strand_mutations_G>A_g2', 'g_strand_mutations_G>A_g3']
         },
         'G>A': {
-            'G-strand': ['G_A_g1', 'G_A_g2', 'G_A_g3'],
-            'C-strand': ['C_G_c1', 'C_G_c2', 'C_G_c3']
+            'G-strand': ['g_strand_mutations_G>A_g1', 'g_strand_mutations_G>A_g2', 'g_strand_mutations_G>A_g3'],
+            'C-strand': ['c_strand_mutations_C>G_c1', 'c_strand_mutations_C>G_c2', 'c_strand_mutations_C>G_c3']
         },
         'G>C': {
-            'G-strand': ['G_C_g1', 'G_C_g2', 'G_C_g3'],
-            'C-strand': ['C_T_c1', 'C_T_c2', 'C_T_c3']
+            'G-strand': ['g_strand_mutations_G>C_g1', 'g_strand_mutations_G>C_g2', 'g_strand_mutations_G>C_g3'],
+            'C-strand': ['c_strand_mutations_C>T_c1', 'c_strand_mutations_C>T_c2', 'c_strand_mutations_C>T_c3']
         },
         'G>T': {
-            'G-strand': ['G_T_g1', 'G_T_g2', 'G_T_g3'],
-            'C-strand': ['C_A_c1', 'C_A_c2', 'C_A_c3']
+            'G-strand': ['g_strand_mutations_G>T_g1', 'g_strand_mutations_G>T_g2', 'g_strand_mutations_G>T_g3'],
+            'C-strand': ['c_strand_mutations_C>A_c1', 'c_strand_mutations_C>A_c2', 'c_strand_mutations_C>A_c3']
         }
     }
     # Ensure plots directory exists

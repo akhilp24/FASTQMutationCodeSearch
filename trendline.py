@@ -15,16 +15,16 @@ def plot_trendlines(data, output_path):
     # Define the variables to plot
     variables = [
         'total_mutations_over_total_g_strand_2xrepeats_per_1k',
-        'G_T_g1_per_1k',  # pos1 mutation rate
-        'G_T_g2_per_1k',  # pos2 mutation rate  
-        'G_T_g3_per_1k'   # pos3 mutation rate
+        'g_strand_mutations_G>T_g1_per_1k',
+        'g_strand_mutations_G>T_g2_per_1k',
+        'g_strand_mutations_G>T_g3_per_1k'
     ]
     
     titles = [
         'Total Mutations per 1000bp',
-        'G < T at Position 1 Mutation Rate per 1000bp',
-        'G < T at Position 2 Mutation Rate per 1000bp',
-        'G < T at Position 3 Mutation Rate per 1000bp'
+        'G > T at Position 1 Mutation Rate per 1000bp',
+        'G > T at Position 2 Mutation Rate per 1000bp',
+        'G > T at Position 3 Mutation Rate per 1000bp'
     ]
     
     # Plot each variable
@@ -63,15 +63,15 @@ def plot_spearman_correlations(data, output_path):
     
     variables = [
         'total_mutations_over_total_g_strand_2xrepeats_per_1k',
-        'G_T_g1_per_1k',
-        'G_T_g2_per_1k',
-        'G_T_g3_per_1k'
+        'g_strand_mutations_G>T_g1_per_1k',
+        'g_strand_mutations_G>T_g2_per_1k',
+        'g_strand_mutations_G>T_g3_per_1k'
     ]
     titles = [
         'Total Mutations per 1000bp',
-        'G < T at Position 1 Mutation Rate per 1000bp',
-        'G < T at Position 2 Mutation Rate per 1000bp',
-        'G < T at Position 3 Mutation Rate per 1000bp'
+        'G > T at Position 1 Mutation Rate per 1000bp',
+        'G > T at Position 2 Mutation Rate per 1000bp',
+        'G > T at Position 3 Mutation Rate per 1000bp'
     ]
     
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))

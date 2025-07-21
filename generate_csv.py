@@ -14,7 +14,7 @@ def read_fastq(file_path: str):
     with open_func(file_path, mode) as f:
         while True:
             header = f.readline().strip()
-            if not header:  # End of file
+            if not header:
                 break
             sequence = f.readline().strip()
             _ = f.readline()  
@@ -112,21 +112,20 @@ def generate_csv(data_dir: str):
         },
     }
     
-    # Create CSV file
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
-        # Define CSV headers
         fieldnames = [
             'FileName', 'Age', 'Telomere_Length',
             'c_strand', 'g_strand',
         ]
-        # Add all sub-pattern keys for mutation groups
         mutation_keys = []
         for group in ['g_strand_mutations', 'c_strand_mutations']:
             for subkey in patterns[group].keys():
                 mutation_keys.append(f"{group}_{subkey}")
         fieldnames.extend(mutation_keys)
+
         # Add normalized rate fields for each mutation key
         fieldnames.extend([f"{k}_per_1k" for k in mutation_keys])
+
         # Add total mutations field at the end
         fieldnames.append('total_mutations_over_total_g_strand_2xrepeats_per_1k')
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -162,7 +161,8 @@ def generate_csv(data_dir: str):
                 'c_strand': c_strand_total,
                 'g_strand': g_strand_total,
             }
-            # Add all mutation sub-pattern counts
+            # TODO The normalization should account for both the c_strand total for c_strand mutations and the g_strand total for g_strand mutations
+
             for k in mutation_keys:
                 row[k] = counts.get(k, 0)
                 row[f"{k}_per_1k"] = per_1k(counts.get(k, 0), g_strand_total)
@@ -172,7 +172,6 @@ def generate_csv(data_dir: str):
             row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k(total_mutations, g_strand_total)
             writer.writerow(row)
             
-            # Print to console as well
             print(f"\nProcessing {filename}:")
             print(f"Age: {age}")
             print(f"Telomere Length: {length}")

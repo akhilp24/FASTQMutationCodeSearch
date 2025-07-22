@@ -14,7 +14,7 @@ def plot_trendlines(data, output_path):
     
     # Define the variables to plot
     variables = [
-        'total_mutations_over_total_g_strand_3xrepeats_per_1k',
+        'total_mutations_over_total_g_strand_2xrepeats_per_1k',
         'g_strand_mutations_G>T_g1_per_1k',
         'g_strand_mutations_G>T_g2_per_1k',
         'g_strand_mutations_G>T_g3_per_1k'
@@ -62,7 +62,7 @@ def plot_spearman_correlations(data, output_path):
     sns.set_palette("husl")
     
     variables = [
-        'total_mutations_over_total_g_strand_3xrepeats_per_1k',
+        'total_mutations_over_total_g_strand_2xrepeats_per_1k',
         'g_strand_mutations_G>T_g1_per_1k',
         'g_strand_mutations_G>T_g2_per_1k',
         'g_strand_mutations_G>T_g3_per_1k'

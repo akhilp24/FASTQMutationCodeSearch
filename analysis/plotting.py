@@ -186,7 +186,7 @@ def plot_composite_score(csv_path, target_col='Age'):
     import scipy.stats as stats
     # Columns to combine
     top_features = [
-        'total_mutations_over_total_g_strand_3xrepeats_per_1k',
+        'total_mutations_over_total_g_strand_2xrepeats_per_1k',
         'g_strand_mutations_A>C_a1_per_1k',
         'g_strand_mutations_T>G_t2_per_1k',
         'g_strand_mutations_T>G_t1_per_1k',

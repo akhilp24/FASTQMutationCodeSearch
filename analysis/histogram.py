@@ -12,7 +12,7 @@ def plot_histograms(data, output_path):
     fig.suptitle('Mutation Rates by Age Groups (10-year bins)', fontsize=16, fontweight='bold')
     
     variables = [
-        'total_mutations_over_total_g_strand_3xrepeats_per_1k',
+        'total_mutations_over_total_g_strand_2xrepeats_per_1k',
         'g_strand_mutations_G>T_g1_per_1k',  # pos1 mutation rate
         'g_strand_mutations_G>T_g2_per_1k',  # pos2 mutation rate  
         'g_strand_mutations_G>T_g3_per_1k'   # pos3 mutation rate

@@ -1,10 +1,10 @@
 import sys
 
 # Step 1: Generate CSV
-# print("[1/4] Generating telomere_analysis.csv ...")
-# from generate_csv import generate_csv
-# data_dir = "greider_data_download"
-# generate_csv(data_dir)
+print("[1/4] Generating telomere_analysis.csv ...")
+from generate_csv import generate_csv
+data_dir = "/Users/akhilpeddikuppa/FieldLab/GreiderCodeSearch/greider_data_download"
+generate_csv(data_dir)
 
 # Step 2: Plot histograms
 print("[2/4] Plotting histograms ...")

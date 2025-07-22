@@ -1,47 +1,49 @@
 import gzip
+import csv
+import os
 
 patterns = {
-    'c_strand': "CCCTAACCCTAACCCTAA",
-    'g_strand': "GGGTTAGGGTTAGGGTTA",
+    'c_strand': "CCCTAACCCTAA",
+    'g_strand': "GGGTTAGGGTTA",
     'g_strand_mutations': {
-        'G>A_g1': "GGGTTAAGGTTAGGGTTA",
-        'G>A_g2': "GGGTTAGAGTTAGGGTTA",
-        'G>A_g3': "GGGTTAGGATTAGGGTTA",
-        'G>C_g1': "GGGTTACGGTTAGGGTTA",
-        'G>C_g2': "GGGTTAGCGTTAGGGTTA",
-        'G>C_g3': "GGGTTAGGCTTAGGGTTA",
-        'G>T_g1': "GGGTTATGGTTAGGGTTA",
-        'G>T_g2': "GGGTTAGTGTTAGGGTTA",
-        'G>T_g3': "GGGTTAGGTTTAGGGTTA",
-        'T>A_t1': "GGGTTAGGGATAGGGTTA",
-        'T>A_t2': "GGGTTAGGGTAAGGGTTA",
-        'T>C_t1': "GGGTCAGGGTTAGGGTTA",
-        'T>C_t2': "GGGTTACGGTTAGGGTTA",
-        'T>G_t1': "GGGTGAGGGTTAGGGTTA",
-        'T>G_t2': "GGGTTAGGGGTAGGGTTA",
-        'A>T_a1': "GGGTTAGGGTTTGGGTTA",
-        'A>G_a1': "GGGTTAGGGTTGGGGTTA",
-        'A>C_a1': "GGGTTAGGGTTCGGGTTA",
+        'G>A_g1': "GGGTTAAGGTTA",
+        'G>A_g2': "GGGTTAGAGTTA",
+        'G>A_g3': "GGGTTAGGATTA",
+        'G>C_g1': "GGGTTACGGTTA",
+        'G>C_g2': "GGGTTAGCGTTA",
+        'G>C_g3': "GGGTTAGGCTTA",
+        'G>T_g1': "GGGTTATGGTTA",
+        'G>T_g2': "GGGTTAGTGTTA",
+        'G>T_g3': "GGGTTAGGTTTA",
+        'T>A_t1': "GGGTTAGGGATA",
+        'T>A_t2': "GGGTTAGGGTAA",
+        'T>C_t1': "GGGTCAGGGTTA",
+        'T>C_t2': "GGGTTACGGTTA",
+        'T>G_t1': "GGGTGAGGGTTA",
+        'T>G_t2': "GGGTTAGGGGTA",
+        'A>T_a1': "GGGTTAGGGTTT",
+        'A>G_a1': "GGGTTAGGGTTG",
+        'A>C_a1': "GGGTTAGGGTTC",
     },
     'c_strand_mutations': {
-        'C>A_c1': "CCCTAAACCTAACCCTAA",
-        'C>A_c2': "CCCTAACACTAACCCTAA",
-        'C>A_c3': "CCCTAACCATAACCCTAA",
-        'C>G_c1': "CCCTAAGCCTAACCCTAA",
-        'C>G_c2': "CCCTAACGCTAACCCTAA",
-        'C>G_c3': "CCCTAACCGTAACCCTAA",
-        'C>T_c1': "CCCTAATCCTAACCCTAA",
-        'C>T_c2': "CCCTAACTCTAACCCTAA",
-        'C>T_c3': "CCCTAACCTTAACCCTAA",
-        'T>A_t1': "CCCTAACCCAAACCCTAA",
-        'T>C_t1': "CCCTAACCCCAACCCTAA",
-        'T>G_t1': "CCCTAACCCGAACCCTAA",
-        'A>T_a1': "CCCTAACCCTTACCCTAA",
-        'A>T_a2': "CCCTAACCCTATCCCTAA",
-        'A>G_a1': "CCCTAACCCTGACCCTAA",
-        'A>G_a2': "CCCTAACCCTAGCCCTAA",
-        'A>C_a1': "CCCTAACCCTCACCCTAA",
-        'A>C_a2': "CCCTAACCCTACCCCTAA",
+        'C>A_c1': "CCCTAAACCTAA",
+        'C>A_c2': "CCCTAACACTAA",
+        'C>A_c3': "CCCTAACCATAA",
+        'C>G_c1': "CCCTAAGCCTAA",
+        'C>G_c2': "CCCTAACGCTAA",
+        'C>G_c3': "CCCTAACCGTAA",
+        'C>T_c1': "CCCTAATCCTAA",
+        'C>T_c2': "CCCTAACTCTAA",
+        'C>T_c3': "CCCTAACCTTAA",
+        'T>A_t1': "CCCTAACCCAAA",
+        'T>C_t1': "CCCTAACCCCAA",
+        'T>G_t1': "CCCTAACCCGAA",
+        'A>T_a1': "CCCTAACCCTTA",
+        'A>T_a2': "CCCTAACCCTAT",
+        'A>G_a1': "CCCTAACCCTGA",
+        'A>G_a2': "CCCTAACCCTAG",
+        'A>C_a1': "CCCTAACCCTCA",
+        'A>C_a2': "CCCTAACCCTAC",
     },
 }
 
@@ -92,5 +94,22 @@ def extract_features_from_fastq(file_path):
             norm_total = g_strand_total
         features[f"{k}_per_1k"] = per_1k(counts.get(k, 0), norm_total)
     total_mutations = sum(counts[k] for k in mutation_keys)
-    features['total_mutations_over_total_g_strand_3xrepeats_per_1k'] = per_1k(total_mutations, g_strand_total)
+    features['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k(total_mutations, g_strand_total)
+
+    # Add Telomere_Length from greider_methods_table_s2.csv
+    # Extract filename base (without path, .fastq, or .gz)
+    filename = os.path.basename(file_path)
+    filename_base = filename.replace('.fastq', '').replace('.gz', '')
+    telomere_length = ''
+    try:
+        with open('/Users/akhilpeddikuppa/FieldLab/GreiderCodeSearch/analysis/greider_methods_table_s2.csv', 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                fastq_name = row['fastq file name'].replace('_', '.')
+                if fastq_name == filename_base:
+                    telomere_length = row['Mean Telomere Length (bps)']
+                    break
+    except Exception as e:
+        telomere_length = ''
+    features['Telomere_Length'] = telomere_length
     return features

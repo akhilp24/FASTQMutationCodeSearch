@@ -4,7 +4,6 @@ import gzip
 from collections import defaultdict
 import csv
 import os
-import numpy as np
 import glob
 
 def read_fastq(file_path: str):
@@ -166,13 +165,6 @@ def generate_csv(data_dir: str):
             'telomere_transition_interaction'
         ])
 
-        # Add summed per-1k columns for each mutation type per strand
-        summed_per_1k_headers = []
-        for strand, mutmap in general_mutation_map.items():
-            for mut, subtypes in mutmap.items():
-                summed_per_1k_headers.append(f"{strand}_{mut}_sum_per_1k")
-        fieldnames.extend(summed_per_1k_headers)
-
         # Add total mutations field at the end
         fieldnames.append('total_mutations_over_total_g_strand_2xrepeats_per_1k')
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -225,19 +217,13 @@ def generate_csv(data_dir: str):
                 for mut, subtypes in mutmap.items():
                     total = sum(counts.get(f"{strand}_mutations_{subtype}", 0) for subtype in subtypes)
                     row[f"{strand}_{mut}_per_1k"] = per_1k(total, strand_total)
-
-            # --- Summed per-1k columns for each mutation type per strand ---
-            for strand, mutmap in general_mutation_map.items():
-                for mut, subtypes in mutmap.items():
-                    per_1k_sum = sum(row.get(f"{strand}_mutations_{subtype}_per_1k", 0) for subtype in subtypes)
-                    row[f"{strand}_{mut}_sum_per_1k"] = per_1k_sum
             
             # Total mutations (sum all mutation counts)
             total_mutations = sum(counts[k] for k in mutation_keys)
             row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k(total_mutations, g_strand_total)
 
             # --- New engineered features ---
-           
+            import numpy as np
 
             # Composite scores (per_1k only)
             transition_keys = [

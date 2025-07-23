@@ -121,6 +121,37 @@ def generate_csv(data_dir: str):
         # Add normalized rate fields for each mutation key
         fieldnames.extend([f"{k}_per_1k" for k in mutation_keys])
 
+        # --- Add general mutation per_1k columns ---
+        general_mutation_map = {
+            'g_strand': {
+                'G>A': ['G>A_g1', 'G>A_g2', 'G>A_g3'],
+                'G>C': ['G>C_g1', 'G>C_g2', 'G>C_g3'],
+                'G>T': ['G>T_g1', 'G>T_g2', 'G>T_g3'],
+                'T>A': ['T>A_t1', 'T>A_t2'],
+                'T>C': ['T>C_t1', 'T>C_t2'],
+                'T>G': ['T>G_t1', 'T>G_t2'],
+                'A>T': ['A>T_a1'],
+                'A>G': ['A>G_a1'],
+                'A>C': ['A>C_a1'],
+            },
+            'c_strand': {
+                'C>A': ['C>A_c1', 'C>A_c2', 'C>A_c3'],
+                'C>G': ['C>G_c1', 'C>G_c2', 'C>G_c3'],
+                'C>T': ['C>T_c1', 'C>T_c2', 'C>T_c3'],
+                'T>A': ['T>A_t1'],
+                'T>C': ['T>C_t1'],
+                'T>G': ['T>G_t1'],
+                'A>T': ['A>T_a1', 'A>T_a2'],
+                'A>G': ['A>G_a1', 'A>G_a2'],
+                'A>C': ['A>C_a1', 'A>C_a2'],
+            }
+        }
+        general_mutation_headers = []
+        for strand, mutmap in general_mutation_map.items():
+            for mut in mutmap:
+                general_mutation_headers.append(f"{strand}_{mut}_per_1k")
+        fieldnames.extend(general_mutation_headers)
+
         # Add new engineered features to the CSV header
         fieldnames.extend([
             'composite_transition_per_1k',
@@ -179,6 +210,13 @@ def generate_csv(data_dir: str):
                 else:
                     norm_total = g_strand_total  # fallback, should not occur
                 row[f"{k}_per_1k"] = per_1k(counts.get(k, 0), norm_total)
+
+            # --- General mutation per_1k columns ---
+            for strand, mutmap in general_mutation_map.items():
+                strand_total = g_strand_total if strand == 'g_strand' else c_strand_total
+                for mut, subtypes in mutmap.items():
+                    total = sum(counts.get(f"{strand}_mutations_{subtype}", 0) for subtype in subtypes)
+                    row[f"{strand}_{mut}_per_1k"] = per_1k(total, strand_total)
             
             # Total mutations (sum all mutation counts)
             total_mutations = sum(counts[k] for k in mutation_keys)

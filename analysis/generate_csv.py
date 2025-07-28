@@ -7,20 +7,41 @@ import os
 import numpy as np
 import glob
 
-def read_fastq(file_path: str):
-    """Read FASTQ file and yield sequences."""
+def read_sequence_file(file_path: str):
+    """Read FASTQ or FASTA file and yield sequences."""
     open_func = gzip.open if file_path.endswith('.gz') else open
     mode = 'rt' if file_path.endswith('.gz') else 'r'
     
+    # Detect format by file extension
+    is_fasta = any(ext in file_path.lower() for ext in ['.fasta', '.fa', '.fas'])
+    
     with open_func(file_path, mode) as f:
-        while True:
-            header = f.readline().strip()
-            if not header:
-                break
-            sequence = f.readline().strip()
-            _ = f.readline()  
-            _ = f.readline() 
-            yield sequence
+        if is_fasta:
+            # FASTA format
+            current_sequence = ""
+            for line in f:
+                line = line.strip()
+                if line.startswith('>'):
+                    # New sequence header - yield previous sequence if exists
+                    if current_sequence:
+                        yield current_sequence
+                        current_sequence = ""
+                else:
+                    # Sequence line - append to current sequence
+                    current_sequence += line
+            # Yield the last sequence
+            if current_sequence:
+                yield current_sequence
+        else:
+            # FASTQ format
+            while True:
+                header = f.readline().strip()
+                if not header:
+                    break
+                sequence = f.readline().strip()
+                _ = f.readline()  # + line
+                _ = f.readline()  # quality line
+                yield sequence
 
 def count_patterns(sequence: str, pattern: str) -> int:
     return sequence.count(pattern)
@@ -45,18 +66,29 @@ def load_length_data():
             length_data[fastq_name] = row['Mean Telomere Length (bps)']
     return length_data
 
-def get_fastq_files(directory: str):
-    """Get all FASTQ files in the given directory."""
-    # Look for both .fastq and .fastq.gz files
-    fastq_files = glob.glob(os.path.join(directory, "*.fastq"))
-    fastq_files.extend(glob.glob(os.path.join(directory, "*.fastq.gz")))
-    return sorted(fastq_files)  # Sort for consistent ordering
+def get_sequence_files(directory: str):
+    """Get all FASTQ and FASTA files in the given directory."""
+    sequence_files = []
+    
+    # FASTQ files
+    sequence_files.extend(glob.glob(os.path.join(directory, "*.fastq")))
+    sequence_files.extend(glob.glob(os.path.join(directory, "*.fastq.gz")))
+    
+    # FASTA files
+    sequence_files.extend(glob.glob(os.path.join(directory, "*.fasta")))
+    sequence_files.extend(glob.glob(os.path.join(directory, "*.fasta.gz")))
+    sequence_files.extend(glob.glob(os.path.join(directory, "*.fa")))
+    sequence_files.extend(glob.glob(os.path.join(directory, "*.fa.gz")))
+    sequence_files.extend(glob.glob(os.path.join(directory, "*.fas")))
+    sequence_files.extend(glob.glob(os.path.join(directory, "*.fas.gz")))
+    
+    return sorted(sequence_files)  # Sort for consistent ordering
 
 def generate_csv(data_dir: str):
-    fastq_files = get_fastq_files(data_dir)
+    sequence_files = get_sequence_files(data_dir)
     
-    if not fastq_files:
-        print(f"No FASTQ files found in {data_dir} directory")
+    if not sequence_files:
+        print(f"No FASTQ or FASTA files found in {data_dir} directory")
         return
     
     # Load age data
@@ -178,10 +210,10 @@ def generate_csv(data_dir: str):
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         
-        for file_path in fastq_files:
+        for file_path in sequence_files:
             counts = defaultdict(int)
             
-            for sequence in read_fastq(file_path):
+            for sequence in read_sequence_file(file_path):  # Changed function name
                 # Count c-strand in forward direction only
                 counts['c_strand'] += count_patterns(sequence, patterns['c_strand'])
                 # Count g-strand in forward direction only
@@ -192,7 +224,13 @@ def generate_csv(data_dir: str):
                         counts[f"{group}_{subkey}"] += count_patterns(sequence, subpattern)
             
             filename = os.path.basename(file_path)
-            filename_base = filename.replace('.fastq', '').replace('.gz', '')
+            # Handle both FASTQ and FASTA extensions
+            filename_base = filename
+            for ext in ['.fastq.gz', '.fastq', '.fasta.gz', '.fasta', '.fa.gz', '.fa', '.fas.gz', '.fas']:
+                if filename_base.endswith(ext):
+                    filename_base = filename_base[:-len(ext)]
+                    break
+            
             age = age_data.get(filename_base, '')
             length = length_data.get(filename_base, '')
             g_strand_total = counts['g_strand']

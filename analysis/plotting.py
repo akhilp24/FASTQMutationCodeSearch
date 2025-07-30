@@ -118,7 +118,6 @@ def plot_mutational_signatures(csv_path):
     os.makedirs('plots', exist_ok=True)
     for idx, row in df.iterrows():
         filename = str(row['FileName']) if 'FileName' in row else f'sample_{idx}'
-        # Remove file extension if present
         filename_base = os.path.splitext(filename)[0]
         output_path = os.path.join('plots', f'{filename_base}.png')
         plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path)

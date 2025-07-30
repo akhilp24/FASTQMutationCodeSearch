@@ -4,7 +4,7 @@ import numpy as np
 import seaborn as sns
 
 # Read the CSV file
-csv_path = 'telomere_analysis.csv'
+csv_path = 'telomere_analysis_2x_repeat.csv'
 df = pd.read_csv(csv_path)
 
 # Clean and filter data
@@ -22,7 +22,7 @@ telomere_lengths = df['Telomere_Length']
 mutations = df['total_mutations_over_total_g_strand_2xrepeats_per_1k']
 
 plt.figure(figsize=(10, 7))
-sc = plt.scatter(ages, telomere_lengths, c=mutations, cmap='viridis', s=60, edgecolor='k', alpha=0.8)
+sc = plt.scatter(ages, telomere_lengths, c=mutations, cmap='magma', s=60, edgecolor='k', alpha=0.8)
 cbar = plt.colorbar(sc)
 cbar.set_label('total_mutations_over_total_g_strand_2xrepeats_per_1k')
 

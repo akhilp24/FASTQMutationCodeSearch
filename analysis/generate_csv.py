@@ -25,7 +25,7 @@ def read_sequence_file(file_path: str):
                     # New sequence header - yield previous sequence if exists
                     if current_sequence:
                         yield current_sequence
-                        current_sequence = ""
+                    current_sequence = ""
                 else:
                     # Sequence line - append to current sequence
                     current_sequence += line
@@ -195,7 +195,11 @@ def generate_csv(data_dir: str):
             'c_strand_mutations_sum_per_1k',
             'log_telomere_length',
             'telomere_length_bin',
-            'telomere_transition_interaction'
+            'telomere_transition_interaction',
+            'mutation_rate_normalized_by_length',
+            'log_telomere_tg_composite',
+            'ratio_ga_g3_ct_c3',
+            'composite_score'
         ])
 
         # Add summed per-1k columns for each mutation type per strand
@@ -207,6 +211,10 @@ def generate_csv(data_dir: str):
 
         # Add total mutations field at the end
         fieldnames.append('total_mutations_over_total_g_strand_2xrepeats_per_1k')
+
+        # Add the new correlation field for c_strand
+        fieldnames.append('total_mutations_over_total_c_strand_2xrepeats_per_1k')
+
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         
@@ -274,8 +282,10 @@ def generate_csv(data_dir: str):
             total_mutations = sum(counts[k] for k in mutation_keys)
             row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k(total_mutations, g_strand_total)
 
+            # New correlation: total mutations over total c-strand 2x repeats per 1k
+            row['total_mutations_over_total_c_strand_2xrepeats_per_1k'] = per_1k(total_mutations, c_strand_total)
+
             # --- New engineered features ---
-           
 
             # Composite scores (per_1k only)
             transition_keys = [
@@ -340,6 +350,48 @@ def generate_csv(data_dir: str):
                 row['telomere_transition_interaction'] = float(row['Telomere_Length']) * row['composite_transition_per_1k']
             except Exception:
                 row['telomere_transition_interaction'] = 0
+
+            # --- New composite scores for higher correlation ---
+            
+            # 1. Mutation Rate Normalized by Length: (Sum of G-strand mutations per 1k) / Telomere_Length
+            try:
+                telomere_length = float(row['Telomere_Length'])
+                if telomere_length > 0:
+                    row['mutation_rate_normalized_by_length'] = row['g_strand_mutations_sum_per_1k'] / telomere_length
+                else:
+                    row['mutation_rate_normalized_by_length'] = 0
+            except Exception:
+                row['mutation_rate_normalized_by_length'] = 0
+
+            # 2. Log-Transformed Composite: log(Telomere_Length) * (G-strand mutations T>G t1 per 1k)
+            try:
+                telomere_length = float(row['Telomere_Length'])
+                tg_t1_per_1k = row.get('g_strand_mutations_T>G_t1_per_1k', 0)
+                if telomere_length > 0:
+                    row['log_telomere_tg_composite'] = np.log(telomere_length) * tg_t1_per_1k
+                else:
+                    row['log_telomere_tg_composite'] = 0
+            except Exception:
+                row['log_telomere_tg_composite'] = 0
+
+            # 3. Ratio of Specific Mutations: (G-strand mutations G>A g3 per 1k) / (C-strand mutations C>T c3 per 1k)
+            try:
+                ga_g3_per_1k = row.get('g_strand_mutations_G>A_g3_per_1k', 0)
+                ct_c3_per_1k = row.get('c_strand_mutations_C>T_c3_per_1k', 0)
+                if ct_c3_per_1k > 0:
+                    row['ratio_ga_g3_ct_c3'] = ga_g3_per_1k / ct_c3_per_1k
+                else:
+                    row['ratio_ga_g3_ct_c3'] = 0
+            except Exception:
+                row['ratio_ga_g3_ct_c3'] = 0
+
+            # 4. Linear Combination (Weighted Sum): -0.6 * Telomere_Length + 0.4 * (Total mutations per 1k)
+            try:
+                telomere_length = float(row['Telomere_Length'])
+                total_mutations_per_1k = row.get('total_mutations_over_total_g_strand_2xrepeats_per_1k', 0)
+                row['composite_score'] = -0.6 * telomere_length + 0.4 * total_mutations_per_1k
+            except Exception:
+                row['composite_score'] = 0
 
             writer.writerow(row)
             

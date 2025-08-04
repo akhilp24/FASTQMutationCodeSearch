@@ -60,11 +60,89 @@ def plot_histograms(data, output_path):
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
+def plot_mutations_per_file(data, output_path):
+    """
+    Create a histogram showing total number of mutations for each file.
+    
+    Args:
+        data: DataFrame with mutation data
+        output_path: Path to save the histogram
+    """
+    # Set up the plotting style
+    sns.set_style("whitegrid")
+    plt.figure(figsize=(16, 10))
+    
+    # Calculate total mutations for each file by summing all raw mutation columns
+    # Get all mutation columns (those that contain 'mutations' but not 'per_1k')
+    mutation_columns = [col for col in data.columns 
+                       if 'mutations' in col and 'per_1k' not in col]
+    
+    # Calculate total mutations per file
+    data_with_totals = data.copy()
+    data_with_totals['Total_Mutations'] = data[mutation_columns].sum(axis=1)
+    
+    # Remove rows with missing data
+    plot_data = data_with_totals.dropna(subset=['FileName', 'Total_Mutations'])
+    
+    if len(plot_data) > 0:
+        # Sort by total mutations for better visualization
+        plot_data = plot_data.sort_values('Total_Mutations', ascending=True)
+        
+        # Create the bar plot
+        plt.figure(figsize=(16, 10))
+        bars = plt.bar(range(len(plot_data)), plot_data['Total_Mutations'], 
+                      color='steelblue', alpha=0.7, edgecolor='black', linewidth=0.5)
+        
+        # Customize the plot
+        plt.title('Total Number of Mutations per File', fontsize=16, fontweight='bold', pad=20)
+        plt.xlabel('Files', fontsize=12, fontweight='bold')
+        plt.ylabel('Total Number of Mutations', fontsize=12, fontweight='bold')
+        
+        # Set x-axis labels to file names (rotated for readability)
+        plt.xticks(range(len(plot_data)), plot_data['FileName'], rotation=45, ha='right')
+        
+        # Add value labels on top of bars for better readability
+        for i, bar in enumerate(bars):
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height + max(plot_data['Total_Mutations'])*0.01,
+                    f'{int(height)}', ha='center', va='bottom', fontsize=8)
+        
+        # Add grid for better readability
+        plt.grid(axis='y', alpha=0.3)
+        
+        # Add some statistics as text
+        mean_mutations = plot_data['Total_Mutations'].mean()
+        median_mutations = plot_data['Total_Mutations'].median()
+        max_mutations = plot_data['Total_Mutations'].max()
+        min_mutations = plot_data['Total_Mutations'].min()
+        
+        stats_text = f'Mean: {mean_mutations:.0f}\nMedian: {median_mutations:.0f}\nMin: {min_mutations:.0f}\nMax: {max_mutations:.0f}'
+        plt.text(0.02, 0.98, stats_text, transform=plt.gca().transAxes, 
+                fontsize=10, verticalalignment='top', 
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+        
+    else:
+        plt.text(0.5, 0.5, 'No data available', ha='center', va='center', 
+                transform=plt.gca().transAxes, fontsize=12)
+        plt.title('Total Number of Mutations per File', fontweight='bold')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
+    
+    return len(plot_data)
+
 def plot_histograms_main():
-    data = pd.read_csv("telomere_analysis.csv")
-    # Plot the histograms
+    data = pd.read_csv("telomere_analysis_2x_repeat.csv")
+    
+    # Plot the age-based histograms
     plot_histograms(data, "histogram.png")
     print("Histogram plot saved as 'histogram.png'")
+    
+    # Plot the mutations per file histogram
+    num_files = plot_mutations_per_file(data, "mutations_per_file_histogram.png")
+    print(f"Mutations per file histogram saved as 'mutations_per_file_histogram.png'")
+    print(f"Processed {num_files} files")
 
 if __name__ == "__main__":
     plot_histograms_main()

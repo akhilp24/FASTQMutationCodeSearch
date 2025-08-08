@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 import os
 import seaborn as sns
+from scipy.optimize import curve_fit
+from scipy import stats
 
 import numbers
 
@@ -374,9 +376,331 @@ def plot_pairwise_r_heatmap(csv_path):
 def plot_pairwise_r_heatmap_main():
     plot_pairwise_r_heatmap('telomere_analysis.csv')
 
+def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots"):
+    """
+    Perform curve fitting analysis for telomere length vs age and mutation rate vs age.
+    Try multiple curve types (linear, exponential, logarithmic, polynomial, power) and export the best-fit plots.
+    
+    The function fits 5 different curve types to each variable and determines the best fit based on R-squared values:
+    - Linear: y = ax + b
+    - Exponential: y = ae^(bx) + c  
+    - Logarithmic: y = a*ln(x+1) + b
+    - Polynomial (cubic): y = ax³ + bx² + cx + d
+    - Power: y = a(x+1)^b + c
+    
+    For each variable, generates a plot showing all fitted curves with the best fit highlighted,
+    identifies outlier points (>2 standard deviations from best-fit curve), and annotates them
+    with sample names. Saves detailed results including R-squared values and fitted parameters to CSV.
+    
+    Args:
+        csv_path: Path to CSV file with Age, Telomere_Length, and mutation rate columns
+        output_dir: Directory to save output plots and results (default: "curve_fitting_plots")
+    
+    Outputs:
+        - Individual curve fitting plots for each variable with outliers highlighted and annotated
+        - curve_fitting_results.csv with R-squared values and parameters for all fits
+        - Console summary of best-fit curves and outlier samples for each variable
+    """
+    # Define curve fitting functions
+    def linear_func(x, a, b):
+        return a * x + b
+    
+    def exponential_func(x, a, b, c):
+        return a * np.exp(b * x) + c
+    
+    def logarithmic_func(x, a, b):
+        return a * np.log(x + 1) + b  # +1 to avoid log(0)
+    
+    def polynomial_func(x, a, b, c, d):
+        return a * x**3 + b * x**2 + c * x + d
+    
+    def power_func(x, a, b, c):
+        return a * (x + 1)**b + c  # +1 to avoid negative bases
+    
+    # Read data
+    df = pd.read_csv(csv_path)
+    
+    # Drop rows with missing Age
+    df = df.dropna(subset=['Age'])
+    
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Set seaborn style
+    sns.set_theme(style="whitegrid", font_scale=1.1)
+    
+    results = []
+    
+    # 1. Telomere Length vs Age Analysis
+    if 'Telomere_Length' in df.columns:
+        telomere_df = df.dropna(subset=['Telomere_Length'])
+        if len(telomere_df) >= 4:  # Need at least 4 points for fitting
+            x_data = telomere_df['Age'].values
+            y_data = telomere_df['Telomere_Length'].values
+            
+            # Try different curve types
+            curve_types = [
+                ('Linear', linear_func, [1, 1]),
+                ('Exponential', exponential_func, [1, 0.01, 1]),
+                ('Logarithmic', logarithmic_func, [1, 1]),
+                ('Polynomial', polynomial_func, [0.01, 0.1, 1, 1]),
+                ('Power', power_func, [1, 0.5, 1])
+            ]
+            
+            best_fit = None
+            best_r_squared = -np.inf
+            
+            plt.figure(figsize=(14, 10))  # Larger figure to accommodate annotations
+            colors = ['red', 'green', 'blue', 'orange', 'purple']
+            
+            for i, (name, func, initial_guess) in enumerate(curve_types):
+                try:
+                    # Perform curve fitting
+                    popt, pcov = curve_fit(func, x_data, y_data, p0=initial_guess, maxfev=5000)
+                    
+                    # Calculate R-squared
+                    y_pred = func(x_data, *popt)
+                    ss_res = np.sum((y_data - y_pred) ** 2)
+                    ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
+                    r_squared = 1 - (ss_res / ss_tot)
+                    
+                    # Store results
+                    results.append({
+                        'Variable': 'Telomere_Length',
+                        'Curve_Type': name,
+                        'R_squared': r_squared,
+                        'Parameters': popt.tolist(),
+                        'Parameter_Errors': np.sqrt(np.diag(pcov)).tolist()
+                    })
+                    
+                    # Plot the fitted curve
+                    x_smooth = np.linspace(x_data.min(), x_data.max(), 100)
+                    y_smooth = func(x_smooth, *popt)
+                    plt.plot(x_smooth, y_smooth, color=colors[i], linestyle='--', 
+                            label=f'{name} (R² = {r_squared:.3f})', linewidth=2)
+                    
+                    # Track best fit
+                    if r_squared > best_r_squared:
+                        best_r_squared = r_squared
+                        best_fit = (name, func, popt)
+                        
+                except Exception as e:
+                    print(f"Could not fit {name} curve to Telomere_Length vs Age: {e}")
+            
+            # Plot original data
+            plt.scatter(x_data, y_data, alpha=0.7, s=50, color='black', label='Data points')
+            
+            # Highlight best fit and identify outliers
+            if best_fit:
+                name, func, popt = best_fit
+                x_smooth = np.linspace(x_data.min(), x_data.max(), 100)
+                y_smooth = func(x_smooth, *popt)
+                plt.plot(x_smooth, y_smooth, color='red', linewidth=3, 
+                        label=f'Best fit: {name} (R² = {best_r_squared:.3f})')
+                
+                # Identify and annotate outliers
+                y_pred = func(x_data, *popt)
+                residuals = y_data - y_pred
+                residual_std = np.std(residuals)
+                outlier_threshold = 2 * residual_std  # Points > 2 std deviations
+                
+                outlier_indices = np.where(np.abs(residuals) > outlier_threshold)[0]
+                if len(outlier_indices) > 0:
+                    # Plot outliers with different color
+                    plt.scatter(x_data[outlier_indices], y_data[outlier_indices], 
+                              alpha=0.9, s=80, color='orange', edgecolor='red', linewidth=2,
+                              label=f'Outliers (>{outlier_threshold:.1f} from curve)', zorder=5)
+                    
+                    print(f"\n--- Telomere Length Outliers ---")
+                    print(f"Outlier threshold: ±{outlier_threshold:.1f} bp")
+                    
+                    # Annotate outliers with sample names
+                    for idx in outlier_indices:
+                        sample_name = telomere_df.iloc[idx]['FileName'] if 'FileName' in telomere_df.columns else f'Sample_{idx}'
+                        age = x_data[idx]
+                        telomere_length = y_data[idx]
+                        residual = residuals[idx]
+                        print(f"  {sample_name}: Age={age:.1f}, TL={telomere_length:.1f}bp, Residual={residual:+.1f}bp")
+                        
+                        # Shorten sample name for plot if too long
+                        display_name = sample_name
+                        if len(str(sample_name)) > 15:
+                            display_name = str(sample_name)[:12] + '...'
+                        plt.annotate(display_name, 
+                                   (x_data[idx], y_data[idx]),
+                                   xytext=(10, 10), textcoords='offset points',
+                                   fontsize=8, ha='left', va='bottom',
+                                   bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
+                                   arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.1'))
+            
+            plt.xlabel('Age (years)', fontsize=12)
+            plt.ylabel('Telomere Length (bp)', fontsize=12)
+            plt.title('Curve Fitting: Telomere Length vs Age', fontsize=14, fontweight='bold')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            
+            # Save plot
+            output_path = os.path.join(output_dir, 'telomere_length_vs_age_curve_fitting.png')
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            print(f"Telomere length curve fitting plot saved: {output_path}")
+    
+    # 2. Mutation Rate vs Age Analysis
+    # Find mutation rate columns (normalized per 1k)
+    mutation_rate_cols = [col for col in df.columns if 'per_1k' in col and col != 'Telomere_Length']
+    
+    if mutation_rate_cols:
+        # Use total mutation rate or composite score if available
+        target_cols = []
+        for col in ['mutation_rate_normalized_by_length', 'composite_score', 'g_strand_mutations_sum_per_1k', 'c_strand_mutations_sum_per_1k']:
+            if col in df.columns:
+                target_cols.append(col)
+        
+        # If no composite columns, use first few individual mutation rate columns
+        if not target_cols:
+            target_cols = mutation_rate_cols[:3]  # Take first 3 columns
+        
+        for col in target_cols:
+            mutation_df = df.dropna(subset=[col])
+            if len(mutation_df) >= 4:  # Need at least 4 points for fitting
+                x_data = mutation_df['Age'].values
+                y_data = mutation_df[col].values
+                
+                # Try different curve types
+                curve_types = [
+                    ('Linear', linear_func, [1, 1]),
+                    ('Exponential', exponential_func, [1, 0.01, 1]),
+                    ('Logarithmic', logarithmic_func, [1, 1]),
+                    ('Polynomial', polynomial_func, [0.01, 0.1, 1, 1]),
+                    ('Power', power_func, [1, 0.5, 1])
+                ]
+                
+                best_fit = None
+                best_r_squared = -np.inf
+                
+                plt.figure(figsize=(14, 10))  # Larger figure to accommodate annotations
+                colors = ['red', 'green', 'blue', 'orange', 'purple']
+                
+                for i, (name, func, initial_guess) in enumerate(curve_types):
+                    try:
+                        # Perform curve fitting
+                        popt, pcov = curve_fit(func, x_data, y_data, p0=initial_guess, maxfev=5000)
+                        
+                        # Calculate R-squared
+                        y_pred = func(x_data, *popt)
+                        ss_res = np.sum((y_data - y_pred) ** 2)
+                        ss_tot = np.sum((y_data - np.mean(y_data)) ** 2)
+                        r_squared = 1 - (ss_res / ss_tot)
+                        
+                        # Store results
+                        results.append({
+                            'Variable': col,
+                            'Curve_Type': name,
+                            'R_squared': r_squared,
+                            'Parameters': popt.tolist(),
+                            'Parameter_Errors': np.sqrt(np.diag(pcov)).tolist()
+                        })
+                        
+                        # Plot the fitted curve
+                        x_smooth = np.linspace(x_data.min(), x_data.max(), 100)
+                        y_smooth = func(x_smooth, *popt)
+                        plt.plot(x_smooth, y_smooth, color=colors[i], linestyle='--', 
+                                label=f'{name} (R² = {r_squared:.3f})', linewidth=2)
+                        
+                        # Track best fit
+                        if r_squared > best_r_squared:
+                            best_r_squared = r_squared
+                            best_fit = (name, func, popt)
+                            
+                    except Exception as e:
+                        print(f"Could not fit {name} curve to {col} vs Age: {e}")
+                
+                # Plot original data
+                plt.scatter(x_data, y_data, alpha=0.7, s=50, color='black', label='Data points')
+                
+                # Highlight best fit and identify outliers
+                if best_fit:
+                    name, func, popt = best_fit
+                    x_smooth = np.linspace(x_data.min(), x_data.max(), 100)
+                    y_smooth = func(x_smooth, *popt)
+                    plt.plot(x_smooth, y_smooth, color='red', linewidth=3, 
+                            label=f'Best fit: {name} (R² = {best_r_squared:.3f})')
+                    
+                    # Identify and annotate outliers
+                    y_pred = func(x_data, *popt)
+                    residuals = y_data - y_pred
+                    residual_std = np.std(residuals)
+                    outlier_threshold = 2 * residual_std  # Points > 2 std deviations
+                    
+                    outlier_indices = np.where(np.abs(residuals) > outlier_threshold)[0]
+                    if len(outlier_indices) > 0:
+                        # Plot outliers with different color
+                        plt.scatter(x_data[outlier_indices], y_data[outlier_indices], 
+                                  alpha=0.9, s=80, color='orange', edgecolor='red', linewidth=2,
+                                  label=f'Outliers (>{outlier_threshold:.3f} from curve)', zorder=5)
+                        
+                        print(f"\n--- {col.replace('_', ' ').title()} Outliers ---")
+                        print(f"Outlier threshold: ±{outlier_threshold:.3f}")
+                        
+                        # Annotate outliers with sample names
+                        for idx in outlier_indices:
+                            sample_name = mutation_df.iloc[idx]['FileName'] if 'FileName' in mutation_df.columns else f'Sample_{idx}'
+                            age = x_data[idx]
+                            value = y_data[idx]
+                            residual = residuals[idx]
+                            print(f"  {sample_name}: Age={age:.1f}, Value={value:.3f}, Residual={residual:+.3f}")
+                            
+                            # Shorten sample name for plot if too long
+                            display_name = sample_name
+                            if len(str(sample_name)) > 15:
+                                display_name = str(sample_name)[:12] + '...'
+                            plt.annotate(display_name, 
+                                       (x_data[idx], y_data[idx]),
+                                       xytext=(10, 10), textcoords='offset points',
+                                       fontsize=8, ha='left', va='bottom',
+                                       bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
+                                       arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.1'))
+                
+                plt.xlabel('Age (years)', fontsize=12)
+                plt.ylabel(col.replace('_', ' ').title(), fontsize=12)
+                plt.title(f'Curve Fitting: {col.replace("_", " ").title()} vs Age', fontsize=14, fontweight='bold')
+                plt.legend()
+                plt.grid(True, alpha=0.3)
+                plt.tight_layout()
+                
+                # Save plot
+                safe_col = col.replace('/', '_').replace(' ', '_').replace('>', 'to').replace('<', 'lt').replace(':', '_')
+                output_path = os.path.join(output_dir, f'{safe_col}_vs_age_curve_fitting.png')
+                plt.savefig(output_path, dpi=300, bbox_inches='tight')
+                plt.close()
+                print(f"Mutation rate curve fitting plot saved: {output_path}")
+    
+    # Save results to CSV
+    if results:
+        results_df = pd.DataFrame(results)
+        results_csv_path = os.path.join(output_dir, "curve_fitting_results.csv")
+        results_df.to_csv(results_csv_path, index=False)
+        print(f"Curve fitting results saved: {results_csv_path}")
+        
+        # Print summary of best fits
+        print("\n=== CURVE FITTING SUMMARY ===")
+        for variable in results_df['Variable'].unique():
+            var_results = results_df[results_df['Variable'] == variable]
+            best_result = var_results.loc[var_results['R_squared'].idxmax()]
+            print(f"{variable}:")
+            print(f"  Best fit: {best_result['Curve_Type']} (R² = {best_result['R_squared']:.4f})")
+            print(f"  Parameters: {best_result['Parameters']}")
+            print()
+
+def curve_fitting_analysis_main():
+    """Main function to run curve fitting analysis"""
+    curve_fitting_analysis('telomere_analysis.csv')
+
 if __name__ == "__main__":
     plot_mutational_signatures_main()
     plot_spearman_with_age_main()
     plot_composite_score_main()
     plot_mutation_r_heatmap_main()
     plot_pairwise_r_heatmap_main()
+    curve_fitting_analysis_main()

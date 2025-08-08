@@ -89,6 +89,7 @@ def plot_mutational_signatures(csv_path):
         ('G>A', 'gray'),
         ('G>C', 'green'),
         ('G>T', 'pink'),
+        ('Frameshifts', 'orange'),
     ]
     mutation_columns = {
         'C>A': {
@@ -114,6 +115,12 @@ def plot_mutational_signatures(csv_path):
         'G>T': {
             'G-strand': ['g_strand_mutations_G>T_g1', 'g_strand_mutations_G>T_g2', 'g_strand_mutations_G>T_g3'],
             'C-strand': ['c_strand_mutations_C>A_c1', 'c_strand_mutations_C>A_c2', 'c_strand_mutations_C>A_c3']
+        },
+        'Frameshifts': {
+            'G-strand-Del': ['g_strand_frameshifts_del_firstG', 'g_strand_frameshifts_del_firstT', 'g_strand_frameshifts_del_secondT', 'g_strand_frameshifts_del_A', 'g_strand_frameshifts_del_midG', 'g_strand_frameshifts_del_lastT', 'g_strand_frameshifts_del_finalA'],
+            'G-strand-Ins': ['g_strand_frameshifts_ins_G_pos1', 'g_strand_frameshifts_ins_G_pos4', 'g_strand_frameshifts_ins_T_pos5', 'g_strand_frameshifts_ins_A_pos6', 'g_strand_frameshifts_ins_G_pos7', 'g_strand_frameshifts_ins_T_pos10', 'g_strand_frameshifts_ins_A_pos12'],
+            'C-strand-Del': ['c_strand_frameshifts_del_firstC', 'c_strand_frameshifts_del_T', 'c_strand_frameshifts_del_firstA', 'c_strand_frameshifts_del_secondA', 'c_strand_frameshifts_del_midC', 'c_strand_frameshifts_del_lastT', 'c_strand_frameshifts_del_finalA'],
+            'C-strand-Ins': ['c_strand_frameshifts_ins_C_pos1', 'c_strand_frameshifts_ins_T_pos4', 'c_strand_frameshifts_ins_A_pos5', 'c_strand_frameshifts_ins_A_pos6', 'c_strand_frameshifts_ins_C_pos7', 'c_strand_frameshifts_ins_T_pos10', 'c_strand_frameshifts_ins_A_pos11']
         }
     }
     # Ensure plots directory exists
@@ -185,13 +192,15 @@ def plot_composite_score(csv_path, target_col='Age'):
     and display the Spearman correlation.
     """
     import scipy.stats as stats
-    # Columns to combine
+    # Columns to combine - updated to use read-based metrics and include frameshifts
     top_features = [
-        'total_mutations_over_total_g_strand_2xrepeats_per_1k',
+        'total_mutations_per_1k_reads',  # Updated to use read-based normalization
         'g_strand_mutations_A>C_a1_per_1k',
         'g_strand_mutations_T>G_t2_per_1k',
         'g_strand_mutations_T>G_t1_per_1k',
-        'g_strand_mutations_G>A_g3_per_1k'
+        'g_strand_mutations_G>A_g3_per_1k',
+        'total_g_strand_frameshifts_per_1k',  # Include frameshift mutations
+        'total_c_strand_frameshifts_per_1k'   # Include frameshift mutations
     ]
     df = pd.read_csv(csv_path)
     # Drop rows with missing target
@@ -243,6 +252,12 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age'):
         return
     # Only use columns with 'per_1k' or 'per1k' in the name, plus total mutation count if present
     mutation_cols = [col for col in numeric_cols if ('per_1k' in col or 'per1k' in col)]
+    
+    # Add the new read-based total mutations column
+    if 'total_mutations_per_1k_reads' in df.columns and 'total_mutations_per_1k_reads' not in mutation_cols:
+        mutation_cols.append('total_mutations_per_1k_reads')
+    
+    # Add legacy total mutation columns for backward compatibility
     total_mut_col = None
     for col in numeric_cols:
         if 'total_mutation' in col and col not in mutation_cols:
@@ -250,6 +265,10 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age'):
             break
     if total_mut_col:
         mutation_cols.append(total_mut_col)
+        
+    # Add frameshift-specific columns
+    frameshift_cols = [col for col in numeric_cols if 'frameshift' in col.lower() and 'per_1k' in col]
+    mutation_cols.extend([col for col in frameshift_cols if col not in mutation_cols])
     if not mutation_cols:
         print("No normalized 'per_1k' or 'per1k' mutation columns found.")
         return
@@ -308,6 +327,12 @@ def plot_pairwise_r_heatmap(csv_path):
     # Only use columns with 'per_1k' or 'per1k' in the name, plus total mutation count if present
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     mutation_cols = [col for col in numeric_cols if ('per_1k' in col or 'per1k' in col)]
+    
+    # Add the new read-based total mutations column
+    if 'total_mutations_per_1k_reads' in df.columns and 'total_mutations_per_1k_reads' not in mutation_cols:
+        mutation_cols.append('total_mutations_per_1k_reads')
+    
+    # Add legacy total mutation columns for backward compatibility
     total_mut_col = None
     for col in numeric_cols:
         if 'total_mutation' in col and col not in mutation_cols:
@@ -315,6 +340,14 @@ def plot_pairwise_r_heatmap(csv_path):
             break
     if total_mut_col:
         mutation_cols.append(total_mut_col)
+        
+    # Add frameshift-specific columns
+    frameshift_cols = [col for col in numeric_cols if 'frameshift' in col.lower() and 'per_1k' in col]
+    mutation_cols.extend([col for col in frameshift_cols if col not in mutation_cols])
+    
+    # Add Total_Reads column if present
+    if 'Total_Reads' in df.columns and 'Total_Reads' in numeric_cols and 'Total_Reads' not in mutation_cols:
+        mutation_cols.append('Total_Reads')
     # Add Age if present
     if 'Age' in df.columns and 'Age' in numeric_cols and 'Age' not in mutation_cols:
         mutation_cols.append('Age')
@@ -551,9 +584,11 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots"):
     mutation_rate_cols = [col for col in df.columns if 'per_1k' in col and col != 'Telomere_Length']
     
     if mutation_rate_cols:
-        # Use total mutation rate or composite score if available
+        # Use total mutation rate or composite score if available - prioritize read-based metrics
         target_cols = []
-        for col in ['mutation_rate_normalized_by_length', 'composite_score', 'g_strand_mutations_sum_per_1k', 'c_strand_mutations_sum_per_1k']:
+        for col in ['total_mutations_per_1k_reads', 'mutation_rate_normalized_by_length', 'composite_score', 
+                   'total_g_strand_frameshifts_per_1k', 'total_c_strand_frameshifts_per_1k',
+                   'g_strand_mutations_sum_per_1k', 'c_strand_mutations_sum_per_1k']:
             if col in df.columns:
                 target_cols.append(col)
         
@@ -697,6 +732,96 @@ def curve_fitting_analysis_main():
     """Main function to run curve fitting analysis"""
     curve_fitting_analysis('telomere_analysis.csv')
 
+def plot_frameshift_analysis(csv_path, target_col='Age'):
+    """
+    Create plots specifically for frameshift mutation analysis.
+    Plots frameshift deletions, insertions, and compound frameshifts vs age.
+    """
+    import scipy.stats as stats
+    
+    # Read data
+    df = pd.read_csv(csv_path)
+    
+    # Drop rows with missing target
+    df = df.dropna(subset=[target_col])
+    
+    # Define frameshift columns to analyze
+    frameshift_columns = {
+        'Total Frameshifts': ['total_g_strand_frameshifts_per_1k', 'total_c_strand_frameshifts_per_1k', 'total_all_frameshifts_per_1k'],
+        'Deletions': ['total_g_strand_deletions_per_1k', 'total_c_strand_deletions_per_1k'],
+        'Insertions': ['total_g_strand_insertions_per_1k', 'total_c_strand_insertions_per_1k'],
+        'G-strand Frameshifts': [col for col in df.columns if col.startswith('g_strand_frameshifts_') and col.endswith('_per_1k')],
+        'C-strand Frameshifts': [col for col in df.columns if col.startswith('c_strand_frameshifts_') and col.endswith('_per_1k')]
+    }
+    
+    # Set seaborn style
+    sns.set_theme(style="whitegrid", font_scale=1.1)
+    
+    # Create output directory
+    output_dir = "frameshift_plots"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    for category_name, columns in frameshift_columns.items():
+        # Filter to existing columns
+        existing_cols = [col for col in columns if col in df.columns]
+        if not existing_cols:
+            continue
+            
+        # For categories with multiple columns, create individual plots
+        if len(existing_cols) > 3:  # Only plot first few to avoid clutter
+            existing_cols = existing_cols[:6]  # Limit to 6 plots
+            
+        fig, axes = plt.subplots(2, 3, figsize=(18, 12))
+        axes = axes.flatten()
+        
+        for i, col in enumerate(existing_cols):
+            if i >= 6:  # Safety check
+                break
+                
+            # Drop rows with missing values in the current column
+            sub_df = df.dropna(subset=[col])
+            if sub_df.shape[0] < 2:
+                axes[i].text(0.5, 0.5, 'Insufficient data', ha='center', va='center', transform=axes[i].transAxes)
+                continue
+                
+            x = sub_df[target_col]
+            y = sub_df[col]
+            
+            # Calculate Spearman correlation
+            corr, pval = stats.spearmanr(x, y)
+            
+            # Plot
+            axes[i].scatter(x, y, alpha=0.7, s=50)
+            if len(x) > 1:
+                # Add trendline
+                z = np.polyfit(x, y, 1)
+                p = np.poly1d(z)
+                axes[i].plot(x, p(x), "r--", alpha=0.8)
+                
+            axes[i].set_xlabel(f'{target_col}', fontsize=10)
+            axes[i].set_ylabel(col.replace('_', ' ').title(), fontsize=10)
+            axes[i].set_title(f"ρ = {corr:.3f} (p={pval:.3g})", fontsize=12)
+            axes[i].grid(True, alpha=0.3)
+        
+        # Hide unused subplots
+        for i in range(len(existing_cols), 6):
+            axes[i].set_visible(False)
+            
+        plt.suptitle(f'{category_name} vs {target_col}', fontsize=16, fontweight='bold')
+        plt.tight_layout()
+        
+        # Save plot
+        safe_name = category_name.replace(' ', '_').replace('-', '_').lower()
+        output_path = os.path.join(output_dir, f"{safe_name}_vs_{target_col.lower()}.png")
+        plt.savefig(output_path, dpi=200, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Frameshift analysis plot saved: {output_path}")
+
+def plot_frameshift_analysis_main():
+    """Main function to run frameshift analysis plots"""
+    plot_frameshift_analysis('telomere_analysis.csv')
+
 if __name__ == "__main__":
     plot_mutational_signatures_main()
     plot_spearman_with_age_main()
@@ -704,3 +829,4 @@ if __name__ == "__main__":
     plot_mutation_r_heatmap_main()
     plot_pairwise_r_heatmap_main()
     curve_fitting_analysis_main()
+    plot_frameshift_analysis_main()  # New frameshift analysis plots

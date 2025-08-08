@@ -46,6 +46,31 @@ def read_sequence_file(file_path: str):
 def count_patterns(sequence: str, pattern: str) -> int:
     return sequence.count(pattern)
 
+def count_total_reads(file_path: str) -> int:
+    """Count the total number of reads in a FASTQ or FASTA file."""
+    read_count = 0
+    open_func = gzip.open if file_path.endswith('.gz') else open
+    mode = 'rt' if file_path.endswith('.gz') else 'r'
+    
+    # Detect format by file extension
+    is_fasta = any(ext in file_path.lower() for ext in ['.fasta', '.fa', '.fas'])
+    
+    with open_func(file_path, mode) as f:
+        if is_fasta:
+            # FASTA format - count header lines starting with '>'
+            for line in f:
+                if line.startswith('>'):
+                    read_count += 1
+        else:
+            # FASTQ format - count every 4th line (headers start with '@')
+            line_count = 0
+            for line in f:
+                line_count += 1
+                if line_count % 4 == 1:  # Every 4th line starting from 1 is a header
+                    read_count += 1
+    
+    return read_count
+
 def load_age_data():
     """Load age data from greider_methods_table_s2.csv."""
     age_data = {}
@@ -202,7 +227,7 @@ def generate_csv(data_dir: str):
     
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
         fieldnames = [
-            'FileName', 'Age', 'Telomere_Length',
+            'FileName', 'Age', 'Telomere_Length', 'Total_Reads',
             'c_strand', 'g_strand',
         ]
         mutation_keys = []
@@ -281,11 +306,14 @@ def generate_csv(data_dir: str):
                 summed_per_1k_headers.append(f"{strand}_{mut}_sum_per_1k")
         fieldnames.extend(summed_per_1k_headers)
 
-        # Add total mutations field at the end
-        fieldnames.append('total_mutations_over_total_g_strand_2xrepeats_per_1k')
+        # Add total mutations field at the end (now read-based)
+        fieldnames.append('total_mutations_per_1k_reads')
 
-        # Add the new correlation field for c_strand
-        fieldnames.append('total_mutations_over_total_c_strand_2xrepeats_per_1k')
+        # Add legacy field names for backward compatibility 
+        fieldnames.extend([
+            'total_mutations_over_total_g_strand_2xrepeats_per_1k',
+            'total_mutations_over_total_c_strand_2xrepeats_per_1k'
+        ])
         
         # Add frameshift-specific fields
         fieldnames.extend([
@@ -303,6 +331,9 @@ def generate_csv(data_dir: str):
         
         for file_path in sequence_files:
             counts = defaultdict(int)
+            
+            # Count total reads in the file
+            total_reads = count_total_reads(file_path)
             
             for sequence in read_sequence_file(file_path):  # Changed function name
                 # Count c-strand in forward direction only
@@ -327,30 +358,30 @@ def generate_csv(data_dir: str):
             g_strand_total = counts['g_strand']
             c_strand_total = counts['c_strand']
 
-            # Calculate per 1k rates for each mutation type
+            # Calculate per 1k rates for each mutation type (now based on total reads)
+            def per_1k_reads(val, total_reads):
+                return (val / total_reads) * 1000 if total_reads > 0 else 0
+            
+            # Keep the old function for backward compatibility with strand-based normalization
             def per_1k(val, total):
                 return (val / total) * 1000 if total > 0 else 0
+                
             row = {
                 'FileName': filename,
                 'Age': age,
                 'Telomere_Length': length,
+                'Total_Reads': total_reads,
                 'c_strand': c_strand_total,
                 'g_strand': g_strand_total,
             }
 
             for k in mutation_keys:
                 row[k] = counts.get(k, 0)
-                if k.startswith('g_strand_mutations') or k.startswith('g_strand_frameshifts'):
-                    norm_total = g_strand_total
-                elif k.startswith('c_strand_mutations') or k.startswith('c_strand_frameshifts'):
-                    norm_total = c_strand_total
-                else:
-                    norm_total = g_strand_total  # fallback, should not occur
-                row[f"{k}_per_1k"] = per_1k(counts.get(k, 0), norm_total)
+                # Use read-based normalization for all mutations
+                row[f"{k}_per_1k"] = per_1k_reads(counts.get(k, 0), total_reads)
 
             # --- General mutation per_1k columns ---
             for strand, mutmap in general_mutation_map.items():
-                strand_total = g_strand_total if strand == 'g_strand' else c_strand_total
                 for mut, subtypes in mutmap.items():
                     # Handle both regular mutations and frameshifts
                     if mut in ['deletions', 'insertions', 'compound_fs']:
@@ -359,7 +390,8 @@ def generate_csv(data_dir: str):
                     else:
                         # Regular mutations
                         total = sum(counts.get(f"{strand}_mutations_{subtype}", 0) for subtype in subtypes)
-                    row[f"{strand}_{mut}_per_1k"] = per_1k(total, strand_total)
+                    # Use read-based normalization
+                    row[f"{strand}_{mut}_per_1k"] = per_1k_reads(total, total_reads)
 
             # --- Summed per-1k columns for each mutation type per strand ---
             for strand, mutmap in general_mutation_map.items():
@@ -373,12 +405,13 @@ def generate_csv(data_dir: str):
                         per_1k_sum = sum(row.get(f"{strand}_mutations_{subtype}_per_1k", 0) for subtype in subtypes)
                     row[f"{strand}_{mut}_sum_per_1k"] = per_1k_sum
             
-            # Total mutations (sum all mutation counts)
+            # Total mutations (sum all mutation counts) - now normalized by total reads
             total_mutations = sum(counts[k] for k in mutation_keys)
-            row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k(total_mutations, g_strand_total)
-
-            # New correlation: total mutations over total c-strand 2x repeats per 1k
-            row['total_mutations_over_total_c_strand_2xrepeats_per_1k'] = per_1k(total_mutations, c_strand_total)
+            row['total_mutations_per_1k_reads'] = per_1k_reads(total_mutations, total_reads)
+            
+            # Legacy fields for backward compatibility
+            row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k_reads(total_mutations, total_reads)
+            row['total_mutations_over_total_c_strand_2xrepeats_per_1k'] = per_1k_reads(total_mutations, total_reads)
 
             # --- New engineered features ---
 
@@ -480,10 +513,10 @@ def generate_csv(data_dir: str):
             except Exception:
                 row['ratio_ga_g3_ct_c3'] = 0
 
-            # 4. Linear Combination (Weighted Sum): -0.6 * Telomere_Length + 0.4 * (Total mutations per 1k)
+            # 4. Linear Combination (Weighted Sum): -0.6 * Telomere_Length + 0.4 * (Total mutations per 1k reads)
             try:
                 telomere_length = float(row['Telomere_Length'])
-                total_mutations_per_1k = row.get('total_mutations_over_total_g_strand_2xrepeats_per_1k', 0)
+                total_mutations_per_1k = row.get('total_mutations_per_1k_reads', 0)
                 row['composite_score'] = -0.6 * telomere_length + 0.4 * total_mutations_per_1k
             except Exception:
                 row['composite_score'] = 0
@@ -526,10 +559,15 @@ def generate_csv(data_dir: str):
             print(f"\nProcessing {filename}:")
             print(f"Age: {age}")
             print(f"Telomere Length: {length}")
-            print(f"2x cstrand total: {c_strand_total}")
-            print(f"2x g strand total: {g_strand_total}")
+            print(f"Total Reads: {total_reads}")
+            print(f"2x c-strand total: {c_strand_total}")
+            print(f"2x g-strand total: {g_strand_total}")
+            print(f"Total mutations found: {total_mutations}")
+            print(f"Frameshifts - G-strand: {row.get('total_g_strand_frameshifts_per_1k', 0):.2f} per 1k reads")
+            print(f"Frameshifts - C-strand: {row.get('total_c_strand_frameshifts_per_1k', 0):.2f} per 1k reads")
             if counts['g_strand'] == 0 and counts['c_strand'] == 0:
-                print(f"Example sequence from {filename}: {sequence}")
+                print(f"Warning: No telomere sequences found in {filename}")
 
 if __name__ == "__main__":
-    generate_csv()
+    data_directory = "../data/tesla_minion1"  # Default data directory
+    generate_csv(data_directory)

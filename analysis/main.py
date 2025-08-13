@@ -18,9 +18,9 @@ from plotting import plot_spearman_with_age_main
 from plotting import plot_composite_score_main
 # from plotting import plot_mutation_r_heatmap_main
 from plotting import plot_pairwise_r_heatmap_main
-plot_mutational_signatures_main()
+# plot_mutational_signatures_main()
 plot_spearman_with_age_main()
-plot_composite_score_main()
+# plot_composite_score_main()
 # plot_mutation_r_heatmap_main()
 plot_pairwise_r_heatmap_main()
 

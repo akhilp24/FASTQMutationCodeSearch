@@ -6,6 +6,7 @@ import csv
 import os
 import numpy as np
 import glob
+import HTSeq
 
 def read_sequence_file(file_path: str):
     """Read FASTQ or FASTA file and yield sequences."""
@@ -48,28 +49,10 @@ def count_patterns(sequence: str, pattern: str) -> int:
 
 def count_total_reads(file_path: str) -> int:
     """Count the total number of reads in a FASTQ or FASTA file."""
-    read_count = 0
-    open_func = gzip.open if file_path.endswith('.gz') else open
-    mode = 'rt' if file_path.endswith('.gz') else 'r'
-    
-    # Detect format by file extension
-    is_fasta = any(ext in file_path.lower() for ext in ['.fasta', '.fa', '.fas'])
-    
-    with open_func(file_path, mode) as f:
-        if is_fasta:
-            # FASTA format - count header lines starting with '>'
-            for line in f:
-                if line.startswith('>'):
-                    read_count += 1
-        else:
-            # FASTQ format - count every 4th line (headers start with '@')
-            line_count = 0
-            for line in f:
-                line_count += 1
-                if line_count % 4 == 1:  # Every 4th line starting from 1 is a header
-                    read_count += 1
-    
-    return read_count
+    count = 0
+    for _ in HTSeq.FastqReader(file_path):
+        count += 1
+    return count
 
 def load_age_data():
     """Load age data from greider_methods_table_s2.csv."""
@@ -163,66 +146,45 @@ def generate_csv(data_dir: str):
             'A>C_a1': "CCCTAACCCTCA",
             'A>C_a2': "CCCTAACCCTAC",
         },
-        'g_strand_frameshifts': {
-            # Deletions (various deletion patterns from GGGTTAGGGTTA)
-            'del_firstG': "GGTTAGGGTTA",      # Delete first G
-            'del_firstT': "GGGTAGGGTTA",      # Delete first T  
-            'del_secondT': "GGGTGGGTTA",      # Delete second T (from TTA)
-            'del_A': "GGGTTGGGTTA",           # Delete A
-            'del_midG': "GGGTTAGGTTA",        # Delete one G from GGG in middle
-            'del_lastT': "GGGTTAGGGTA",       # Delete one T from TTA at end
-            'del_finalA': "GGGTTAGGGTT",      # Delete final A
-            
-            # Insertions (13bp variants from 12bp standard)
-            'ins_G_pos1': "GGGGTTTAGGGTTA",   # Insert G at position 1
-            'ins_G_pos4': "GGGTTGAGGGTTA",    # Insert G after TTA
-            'ins_T_pos5': "GGGTTATGGGTTA",    # Insert T after A
-            'ins_A_pos6': "GGGTTAAGGGTTA",    # Insert A after first repeat
-            'ins_G_pos7': "GGGTTAGGGGTTA",    # Insert G in second repeat
-            'ins_T_pos10': "GGGTTAGGGTTTA",   # Insert T in TTA
-            'ins_A_pos12': "GGGTTAGGGTTAA",   # Insert A at end
-            
-            # Compound frameshift: examples like GGGTTAGGGTTA -> GGGTTAGGTTAG
-            'fs_delT_insG': "GGGTTAGGTTAG",    # Delete T, insert G (your example)
-            'fs_shift_end': "GGGTTAGGGTAG",    # Shift at end: TTA -> TAG  
-            'fs_shift_mid': "GGGTTAGAGGTTA",   # Shift in middle
-            'fs_dup_partial': "GGGTTAGGGGGTTTA", # Partial duplication
-            
-            # Other common frameshift patterns
-            'fs_GGTTA_to_GGTAG': "GGGTTAGGTAG",  # TTA->TAG shift
-            'fs_slip_rep1': "GGGTTGGGTTA",       # Slippage in first repeat
-            'fs_slip_rep2': "GGGTTAGGTTA",       # Slippage in second repeat
-        },
-        'c_strand_frameshifts': {
-            # Deletions for C-strand (CCCTAACCCTAA -> variants)
-            'del_firstC': "CCTAACCCTAA",      # Delete first C
-            'del_T': "CCCAACCCTAA",           # Delete T
-            'del_firstA': "CCCTACCCTAA",      # Delete first A
-            'del_secondA': "CCCTACCTAA",      # Delete second A (from AA in middle)
-            'del_midC': "CCCTAACCTAA",        # Delete one C from CCC in middle
-            'del_lastT': "CCCTAACCCAA",       # Delete T in second repeat  
-            'del_finalA': "CCCTAACCCTA",      # Delete final A
-            
-            # Insertions for C-strand
-            'ins_C_pos1': "CCCCTAACCCTAA",    # Insert C at start
-            'ins_T_pos4': "CCCTAACCCTAA",     # Insert T after CCT
-            'ins_A_pos5': "CCCTAAACCCTAA",    # Insert A after TA
-            'ins_A_pos6': "CCCTAAACCCTAA",    # Insert A after first repeat
-            'ins_C_pos7': "CCCTAACCCCTAA",    # Insert C in second repeat
-            'ins_T_pos10': "CCCTAACCCTTAA",   # Insert T in second repeat
-            'ins_A_pos11': "CCCTAACCCTAAA",   # Insert A at end
-            
-            # Compound frameshifts for C-strand
-            'fs_delA_insT': "CCCTAACCCTATA",   # Similar pattern to G-strand example
-            'fs_shift_end': "CCCTAACCCTAG",    # AA -> AG shift
-            'fs_shift_mid': "CCCTAACGCTAA",    # Shift in middle
-            'fs_dup_partial': "CCCTAACCCCTAAA", # Partial duplication
-            
-            # Other C-strand frameshift patterns
-            'fs_TAA_to_TAG': "CCCTAACCCTAG",   # TAA->TAG shift
-            'fs_slip_rep1': "CCCTACCCTAA",     # Slippage in first repeat
-            'fs_slip_rep2': "CCCTAACCTAA",     # Slippage in second repeat
-        },
+        # 'g_strand_frameshifts': {
+        #     'del_firstG': "GGGTTAGGTTAG",
+        #     'del_firstT': "GGGTTAGGGTAG",
+        #     'del_secondT': "GGGTTAGGGTAG",
+        #     'del_A': "GGGTTAGGGTTG",
+        #     'ins_G_pos1': "GGGTTAGGGGTTA",
+        #     'ins_G_pos4': "GGGTTAGGGTTA",
+        #     'ins_T_pos5': "GGGTTATGGGTTA",
+        #     'ins_A_pos6': "GGGTTAAGGGTTA",
+        #     'ins_G_pos7': "GGGTTAGGGGTTA",
+        #     'ins_T_pos10': "GGGTTAGGGTTTA",
+        #     'ins_A_pos12': "GGGTTAGGGTTAA",
+        #     'fs_GGTTA_to_GGTAG': "GGGTTAGGTAG",
+        #     'fs_slip_rep1': "GGGTTGGGTTA",
+        #     'fs_slip_rep2': "GGGTTAGGTTA",
+        # },
+        # 'c_strand_frameshifts': {
+        #     'del_firstC': "ACCTAACCCTAA",
+        #     'del_T': "CCCAACCCTAA",
+        #     'del_firstA': "CCCTACCCTAA",
+        #     'del_secondA': "CCCTACCTAA",
+        #     'del_midC': "CCCTAACCTAA",
+        #     'del_lastT': "CCCTAACCCAA",
+        #     'del_finalA': "CCCTAACCCTA",
+        #     'ins_C_pos1': "CCCCTAACCCTAA",
+        #     'ins_T_pos4': "CCCTAACCCTAA",
+        #     'ins_A_pos5': "CCCTAAACCCTAA",
+        #     'ins_A_pos6': "CCCTAAACCCTAA",
+        #     'ins_C_pos7': "CCCTAACCCCTAA",
+        #     'ins_T_pos10': "CCCTAACCCTTAA",
+        #     'ins_A_pos11': "CCCTAACCCTAAA",
+        #     'fs_delA_insT': "CCCTAACCCTATA",
+        #     'fs_shift_end': "CCCTAACCCTAG",
+        #     'fs_shift_mid': "CCCTAACGCTAA",
+        #     'fs_dup_partial': "CCCTAACCCCTAAA",
+        #     'fs_TAA_to_TAG': "CCCTAACCCTAG",
+        #     'fs_slip_rep1': "CCCTACCCTAA",
+        #     'fs_slip_rep2': "CCCTAACCTAA",
+        # },
     }
     
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
@@ -231,7 +193,7 @@ def generate_csv(data_dir: str):
             'c_strand', 'g_strand',
         ]
         mutation_keys = []
-        for group in ['g_strand_mutations', 'c_strand_mutations', 'g_strand_frameshifts', 'c_strand_frameshifts']:
+        for group in ['g_strand_mutations', 'c_strand_mutations']:
             for subkey in patterns[group].keys():
                 mutation_keys.append(f"{group}_{subkey}")
         fieldnames.extend(mutation_keys)
@@ -251,12 +213,6 @@ def generate_csv(data_dir: str):
                 'A>T': ['A>T_a1'],
                 'A>G': ['A>G_a1'],
                 'A>C': ['A>C_a1'],
-                # Frameshift categories
-                'deletions': ['del_firstG', 'del_firstT', 'del_secondT', 'del_A', 'del_midG', 'del_lastT', 'del_finalA'],
-                'insertions': ['ins_G_pos1', 'ins_G_pos4', 'ins_T_pos5', 'ins_A_pos6', 
-                              'ins_G_pos7', 'ins_T_pos10', 'ins_A_pos12'],
-                'compound_fs': ['fs_delT_insG', 'fs_shift_end', 'fs_shift_mid', 'fs_dup_partial',
-                               'fs_GGTTA_to_GGTAG', 'fs_slip_rep1', 'fs_slip_rep2'],
             },
             'c_strand': {
                 'C>A': ['C>A_c1', 'C>A_c2', 'C>A_c3'],
@@ -268,12 +224,6 @@ def generate_csv(data_dir: str):
                 'A>T': ['A>T_a1', 'A>T_a2'],
                 'A>G': ['A>G_a1', 'A>G_a2'],
                 'A>C': ['A>C_a1', 'A>C_a2'],
-                # Frameshift categories
-                'deletions': ['del_firstC', 'del_T', 'del_firstA', 'del_secondA', 'del_midC', 'del_lastT', 'del_finalA'],
-                'insertions': ['ins_C_pos1', 'ins_T_pos4', 'ins_A_pos5', 'ins_A_pos6',
-                              'ins_C_pos7', 'ins_T_pos10', 'ins_A_pos11'],
-                'compound_fs': ['fs_delA_insT', 'fs_shift_end', 'fs_shift_mid', 'fs_dup_partial',
-                               'fs_TAA_to_TAG', 'fs_slip_rep1', 'fs_slip_rep2'],
             }
         }
         general_mutation_headers = []
@@ -286,8 +236,8 @@ def generate_csv(data_dir: str):
         fieldnames.extend([
             'composite_transition_per_1k',
             'composite_transversion_per_1k',
-            'mutation_ratio_CtoA_CtoT',
-            'mutation_ratio_GtoA_GtoT',
+            # 'mutation_ratio_CtoA_CtoT',
+            # 'mutation_ratio_GtoA_GtoT',
             'g_strand_mutations_sum_per_1k',
             'c_strand_mutations_sum_per_1k',
             'log_telomere_length',
@@ -295,7 +245,7 @@ def generate_csv(data_dir: str):
             'telomere_transition_interaction',
             'mutation_rate_normalized_by_length',
             'log_telomere_tg_composite',
-            'ratio_ga_g3_ct_c3',
+            # 'ratio_ga_g3_ct_c3',
             'composite_score'
         ])
 
@@ -306,8 +256,8 @@ def generate_csv(data_dir: str):
                 summed_per_1k_headers.append(f"{strand}_{mut}_sum_per_1k")
         fieldnames.extend(summed_per_1k_headers)
 
-        # Add total mutations field at the end (now read-based)
-        fieldnames.append('total_mutations_per_1k_reads')
+        # Add total mutations field at the end (now strand-specific normalized)
+        fieldnames.append('total_mutations_per_1k_strand_specific')
 
         # Add legacy field names for backward compatibility 
         fieldnames.extend([
@@ -315,16 +265,16 @@ def generate_csv(data_dir: str):
             'total_mutations_over_total_c_strand_2xrepeats_per_1k'
         ])
         
-        # Add frameshift-specific fields
-        fieldnames.extend([
-            'total_g_strand_frameshifts_per_1k',
-            'total_c_strand_frameshifts_per_1k',
-            'total_all_frameshifts_per_1k',
-            'total_g_strand_deletions_per_1k',
-            'total_c_strand_deletions_per_1k', 
-            'total_g_strand_insertions_per_1k',
-            'total_c_strand_insertions_per_1k'
-        ])
+        # Add frameshift-specific fields (disabled)
+        # fieldnames.extend([
+        #     'total_g_strand_frameshifts_per_1k',
+        #     'total_c_strand_frameshifts_per_1k',
+        #     'total_all_frameshifts_per_1k',
+        #     'total_g_strand_deletions_per_1k',
+        #     'total_c_strand_deletions_per_1k', 
+        #     'total_g_strand_insertions_per_1k',
+        #     'total_c_strand_insertions_per_1k'
+        # ])
 
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -340,8 +290,8 @@ def generate_csv(data_dir: str):
                 counts['c_strand'] += count_patterns(sequence, patterns['c_strand'])
                 # Count g-strand in forward direction only
                 counts['g_strand'] += count_patterns(sequence, patterns['g_strand'])
-                # Count all mutation sub-patterns including frameshifts
-                for group in ['g_strand_mutations', 'c_strand_mutations', 'g_strand_frameshifts', 'c_strand_frameshifts']:
+                # Count all mutation sub-patterns (frameshifts disabled)
+                for group in ['g_strand_mutations', 'c_strand_mutations']:
                     for subkey, subpattern in patterns[group].items():
                         counts[f"{group}_{subkey}"] += count_patterns(sequence, subpattern)
             
@@ -358,9 +308,16 @@ def generate_csv(data_dir: str):
             g_strand_total = counts['g_strand']
             c_strand_total = counts['c_strand']
 
-            # Calculate per 1k rates for each mutation type (now based on total reads)
-            def per_1k_reads(val, total_reads):
-                return (val / total_reads) * 1000 if total_reads > 0 else 0
+            # Calculate strand-specific normalization denominators
+            g_strand_mutations_total = sum(counts[k] for k in counts if k.startswith('g_strand_mutations_'))
+            c_strand_mutations_total = sum(counts[k] for k in counts if k.startswith('c_strand_mutations_'))
+            
+            g_strand_normalizer = g_strand_total + g_strand_mutations_total
+            c_strand_normalizer = c_strand_total + c_strand_mutations_total
+
+            # New strand-specific normalization function
+            def per_1k_strand_specific(val, strand_normalizer):
+                return (val / strand_normalizer) * 1000 if strand_normalizer > 0 else 0
             
             # Keep the old function for backward compatibility with strand-based normalization
             def per_1k(val, total):
@@ -377,41 +334,47 @@ def generate_csv(data_dir: str):
 
             for k in mutation_keys:
                 row[k] = counts.get(k, 0)
-                # Use read-based normalization for all mutations
-                row[f"{k}_per_1k"] = per_1k_reads(counts.get(k, 0), total_reads)
+                # Use strand-specific normalization for mutations
+                if k.startswith('g_strand_mutations_'):
+                    row[f"{k}_per_1k"] = per_1k_strand_specific(counts.get(k, 0), g_strand_normalizer)
+                elif k.startswith('c_strand_mutations_'):
+                    row[f"{k}_per_1k"] = per_1k_strand_specific(counts.get(k, 0), c_strand_normalizer)
+                else:
+                    # Fallback for any other keys
+                    row[f"{k}_per_1k"] = per_1k_strand_specific(counts.get(k, 0), g_strand_normalizer)
 
             # --- General mutation per_1k columns ---
             for strand, mutmap in general_mutation_map.items():
                 for mut, subtypes in mutmap.items():
-                    # Handle both regular mutations and frameshifts
-                    if mut in ['deletions', 'insertions', 'compound_fs']:
-                        # Frameshift mutations
-                        total = sum(counts.get(f"{strand}_frameshifts_{subtype}", 0) for subtype in subtypes)
-                    else:
-                        # Regular mutations
-                        total = sum(counts.get(f"{strand}_mutations_{subtype}", 0) for subtype in subtypes)
-                    # Use read-based normalization
-                    row[f"{strand}_{mut}_per_1k"] = per_1k_reads(total, total_reads)
+                    # Regular mutations only (frameshifts disabled)
+                    total = sum(counts.get(f"{strand}_mutations_{subtype}", 0) for subtype in subtypes)
+                    # Use strand-specific normalization
+                    if strand == 'g_strand':
+                        row[f"{strand}_{mut}_per_1k"] = per_1k_strand_specific(total, g_strand_normalizer)
+                    else:  # c_strand
+                        row[f"{strand}_{mut}_per_1k"] = per_1k_strand_specific(total, c_strand_normalizer)
 
             # --- Summed per-1k columns for each mutation type per strand ---
             for strand, mutmap in general_mutation_map.items():
                 for mut, subtypes in mutmap.items():
-                    # Handle both regular mutations and frameshifts
-                    if mut in ['deletions', 'insertions', 'compound_fs']:
-                        # Frameshift mutations
-                        per_1k_sum = sum(row.get(f"{strand}_frameshifts_{subtype}_per_1k", 0) for subtype in subtypes)
-                    else:
-                        # Regular mutations
-                        per_1k_sum = sum(row.get(f"{strand}_mutations_{subtype}_per_1k", 0) for subtype in subtypes)
+                    # Regular mutations only (frameshifts disabled)
+                    per_1k_sum = sum(row.get(f"{strand}_mutations_{subtype}_per_1k", 0) for subtype in subtypes)
                     row[f"{strand}_{mut}_sum_per_1k"] = per_1k_sum
             
-            # Total mutations (sum all mutation counts) - now normalized by total reads
+            # Total mutations (sum all mutation counts) - now normalized by strand-specific normalizers
             total_mutations = sum(counts[k] for k in mutation_keys)
-            row['total_mutations_per_1k_reads'] = per_1k_reads(total_mutations, total_reads)
+            # Use weighted average of strand-specific normalizations
+            if g_strand_normalizer > 0 or c_strand_normalizer > 0:
+                g_weight = g_strand_mutations_total / total_mutations if total_mutations > 0 else 0
+                c_weight = c_strand_mutations_total / total_mutations if total_mutations > 0 else 0
+                weighted_normalizer = (g_weight * g_strand_normalizer) + (c_weight * c_strand_normalizer)
+                row['total_mutations_per_1k_strand_specific'] = per_1k_strand_specific(total_mutations, weighted_normalizer)
+            else:
+                row['total_mutations_per_1k_strand_specific'] = 0
             
-            # Legacy fields for backward compatibility
-            row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k_reads(total_mutations, total_reads)
-            row['total_mutations_over_total_c_strand_2xrepeats_per_1k'] = per_1k_reads(total_mutations, total_reads)
+            # Legacy fields for backward compatibility - now use strand-specific normalization
+            row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k_strand_specific(total_mutations, g_strand_normalizer)
+            row['total_mutations_over_total_c_strand_2xrepeats_per_1k'] = per_1k_strand_specific(total_mutations, c_strand_normalizer)
 
             # --- New engineered features ---
 
@@ -438,22 +401,10 @@ def generate_csv(data_dir: str):
             row['composite_transition_per_1k'] = sum(row.get(k, 0) for k in transition_keys)
             row['composite_transversion_per_1k'] = sum(row.get(k, 0) for k in transversion_keys)
 
-            # Mutation ratios
-            def safe_ratio(a, b):
-                return a / b if b != 0 else 0
 
-            row['mutation_ratio_CtoA_CtoT'] = safe_ratio(
-                sum(row.get(k, 0) for k in ['c_strand_mutations_C>A_c1_per_1k', 'c_strand_mutations_C>A_c2_per_1k', 'c_strand_mutations_C>A_c3_per_1k']),
-                sum(row.get(k, 0) for k in ['c_strand_mutations_C>T_c1_per_1k', 'c_strand_mutations_C>T_c2_per_1k', 'c_strand_mutations_C>T_c3_per_1k']) + 1e-6
-            )
-            row['mutation_ratio_GtoA_GtoT'] = safe_ratio(
-                sum(row.get(k, 0) for k in ['g_strand_mutations_G>A_g1_per_1k', 'g_strand_mutations_G>A_g2_per_1k', 'g_strand_mutations_G>A_g3_per_1k']),
-                sum(row.get(k, 0) for k in ['g_strand_mutations_G>T_g1_per_1k', 'g_strand_mutations_G>T_g2_per_1k', 'g_strand_mutations_G>T_g3_per_1k']) + 1e-6
-            )
-
-            # Composite per strand (including frameshifts)
-            row['g_strand_mutations_sum_per_1k'] = sum(row.get(k, 0) for k in row if (k.startswith('g_strand_mutations') or k.startswith('g_strand_frameshifts')) and k.endswith('_per_1k'))
-            row['c_strand_mutations_sum_per_1k'] = sum(row.get(k, 0) for k in row if (k.startswith('c_strand_mutations') or k.startswith('c_strand_frameshifts')) and k.endswith('_per_1k'))
+            # Composite per strand (frameshifts disabled)
+            row['g_strand_mutations_sum_per_1k'] = sum(row.get(k, 0) for k in row if k.startswith('g_strand_mutations') and k.endswith('_per_1k'))
+            row['c_strand_mutations_sum_per_1k'] = sum(row.get(k, 0) for k in row if k.startswith('c_strand_mutations') and k.endswith('_per_1k'))
 
             # Log-transformed telomere length
             try:
@@ -502,57 +453,14 @@ def generate_csv(data_dir: str):
             except Exception:
                 row['log_telomere_tg_composite'] = 0
 
-            # 3. Ratio of Specific Mutations: (G-strand mutations G>A g3 per 1k) / (C-strand mutations C>T c3 per 1k)
-            try:
-                ga_g3_per_1k = row.get('g_strand_mutations_G>A_g3_per_1k', 0)
-                ct_c3_per_1k = row.get('c_strand_mutations_C>T_c3_per_1k', 0)
-                if ct_c3_per_1k > 0:
-                    row['ratio_ga_g3_ct_c3'] = ga_g3_per_1k / ct_c3_per_1k
-                else:
-                    row['ratio_ga_g3_ct_c3'] = 0
-            except Exception:
-                row['ratio_ga_g3_ct_c3'] = 0
 
-            # 4. Linear Combination (Weighted Sum): -0.6 * Telomere_Length + 0.4 * (Total mutations per 1k reads)
+            # 4. Linear Combination (Weighted Sum): -0.6 * Telomere_Length + 0.4 * (Total mutations per 1k strand-specific)
             try:
                 telomere_length = float(row['Telomere_Length'])
-                total_mutations_per_1k = row.get('total_mutations_per_1k_reads', 0)
+                total_mutations_per_1k = row.get('total_mutations_per_1k_strand_specific', 0)
                 row['composite_score'] = -0.6 * telomere_length + 0.4 * total_mutations_per_1k
             except Exception:
                 row['composite_score'] = 0
-
-            # --- Calculate frameshift totals ---
-            
-            # Total frameshifts per strand
-            row['total_g_strand_frameshifts_per_1k'] = sum(row.get(k, 0) for k in row if k.startswith('g_strand_frameshifts') and k.endswith('_per_1k'))
-            row['total_c_strand_frameshifts_per_1k'] = sum(row.get(k, 0) for k in row if k.startswith('c_strand_frameshifts') and k.endswith('_per_1k'))
-            row['total_all_frameshifts_per_1k'] = row['total_g_strand_frameshifts_per_1k'] + row['total_c_strand_frameshifts_per_1k']
-            
-            # Deletion totals
-            g_deletions = ['g_strand_frameshifts_del_firstG_per_1k', 'g_strand_frameshifts_del_firstT_per_1k', 
-                          'g_strand_frameshifts_del_secondT_per_1k', 'g_strand_frameshifts_del_A_per_1k', 
-                          'g_strand_frameshifts_del_midG_per_1k', 'g_strand_frameshifts_del_lastT_per_1k', 
-                          'g_strand_frameshifts_del_finalA_per_1k']
-            row['total_g_strand_deletions_per_1k'] = sum(row.get(k, 0) for k in g_deletions)
-            
-            c_deletions = ['c_strand_frameshifts_del_firstC_per_1k', 'c_strand_frameshifts_del_T_per_1k',
-                          'c_strand_frameshifts_del_firstA_per_1k', 'c_strand_frameshifts_del_secondA_per_1k',
-                          'c_strand_frameshifts_del_midC_per_1k', 'c_strand_frameshifts_del_lastT_per_1k',
-                          'c_strand_frameshifts_del_finalA_per_1k']
-            row['total_c_strand_deletions_per_1k'] = sum(row.get(k, 0) for k in c_deletions)
-            
-            # Insertion totals
-            g_insertions = ['g_strand_frameshifts_ins_G_pos1_per_1k', 'g_strand_frameshifts_ins_G_pos4_per_1k',
-                           'g_strand_frameshifts_ins_T_pos5_per_1k', 'g_strand_frameshifts_ins_A_pos6_per_1k',
-                           'g_strand_frameshifts_ins_G_pos7_per_1k', 'g_strand_frameshifts_ins_T_pos10_per_1k',
-                           'g_strand_frameshifts_ins_A_pos12_per_1k']
-            row['total_g_strand_insertions_per_1k'] = sum(row.get(k, 0) for k in g_insertions)
-            
-            c_insertions = ['c_strand_frameshifts_ins_C_pos1_per_1k', 'c_strand_frameshifts_ins_T_pos4_per_1k',
-                           'c_strand_frameshifts_ins_A_pos5_per_1k', 'c_strand_frameshifts_ins_A_pos6_per_1k',
-                           'c_strand_frameshifts_ins_C_pos7_per_1k', 'c_strand_frameshifts_ins_T_pos10_per_1k',
-                           'c_strand_frameshifts_ins_A_pos11_per_1k']
-            row['total_c_strand_insertions_per_1k'] = sum(row.get(k, 0) for k in c_insertions)
 
             writer.writerow(row)
             
@@ -562,12 +470,15 @@ def generate_csv(data_dir: str):
             print(f"Total Reads: {total_reads}")
             print(f"2x c-strand total: {c_strand_total}")
             print(f"2x g-strand total: {g_strand_total}")
+            print(f"G-strand mutations total: {g_strand_mutations_total}")
+            print(f"C-strand mutations total: {c_strand_mutations_total}")
+            print(f"G-strand normalizer (2x repeats + mutations): {g_strand_normalizer}")
+            print(f"C-strand normalizer (2x repeats + mutations): {c_strand_normalizer}")
             print(f"Total mutations found: {total_mutations}")
-            print(f"Frameshifts - G-strand: {row.get('total_g_strand_frameshifts_per_1k', 0):.2f} per 1k reads")
-            print(f"Frameshifts - C-strand: {row.get('total_c_strand_frameshifts_per_1k', 0):.2f} per 1k reads")
+            # print(f"Frameshifts - G-strand: {row.get('total_g_strand_frameshifts_per_1k', 0):.2f} per 1k reads")
+            # print(f"Frameshifts - C-strand: {row.get('total_c_strand_frameshifts_per_1k', 0):.2f} per 1k reads")
             if counts['g_strand'] == 0 and counts['c_strand'] == 0:
                 print(f"Warning: No telomere sequences found in {filename}")
 
-if __name__ == "__main__":
-    data_directory = "../data/tesla_minion1"  # Default data directory
-    generate_csv(data_directory)
+if __name__ == "__main__":  
+    generate_csv()

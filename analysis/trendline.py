@@ -1,7 +1,7 @@
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, linregress
 
 def plot_trendlines(data, output_path):
     # Set up the plotting style
@@ -15,15 +15,15 @@ def plot_trendlines(data, output_path):
     # Define the variables to plot
     variables = [
          'total_mutations_over_total_g_strand_2xrepeats_per_1k',
-        'g_strand_A>G_sum_per_1k',  # pos1 mutation rate
-        'g_strand_T>G_sum_per_1k',  # pos2 mutation rate  
-        'g_strand_T>C_sum_per_1k'   # pos3 mutation rate
+        'g_strand_T>C_sum_per_1k',  # pos1 mutation rate
+        'g_strand_G>T_sum_per_1k',  # pos2 mutation rate  
+        'g_strand_T>G_sum_per_1k'   # pos3 mutation rate
     ]
     titles = [
         'Total Mutations per 1000bp',
-        'G > A Mutation Rate per 1000bp',
-        'T > G Mutation Rate per 1000bp',
-        'T > C Mutation Rate per 1000bp'
+        'T > C Mutation Rate per 1000bp',
+        'G > T Mutation Rate per 1000bp',
+        'T > G Mutation Rate per 1000bp'
     ]
     
     # Plot each variable
@@ -39,12 +39,20 @@ def plot_trendlines(data, output_path):
             # Create scatter plot
             sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.6)
             
-            # Add trendline
+            # Add trendline and calculate R-squared
             if len(plot_data) > 1:
                 sns.regplot(data=plot_data, x='Age', y=var, ax=ax, 
                           scatter=False, line_kws={'color': 'blue', 'linestyle': '--'})
+                
+                # Calculate R-squared value
+                slope, intercept, r_value, p_value, std_err = linregress(plot_data['Age'], plot_data[var])
+                r_squared = r_value ** 2
+                
+                # Add R-squared to title
+                ax.set_title(f"{title}\nR² = {r_squared:.3f}", fontweight='bold')
+            else:
+                ax.set_title(title, fontweight='bold')
             
-            ax.set_title(title, fontweight='bold')
             ax.set_xlabel('Age')
             ax.set_ylabel('Mutations per 1000bp')
         else:
@@ -62,15 +70,15 @@ def plot_spearman_correlations(data, output_path):
     
     variables = [
          'total_mutations_over_total_g_strand_2xrepeats_per_1k',
-        'g_strand_A>G_sum_per_1k',  # pos1 mutation rate
-        'g_strand_T>G_sum_per_1k',  # pos2 mutation rate  
-        'g_strand_T>C_sum_per_1k'   # pos3 mutation rate
+        'g_strand_T>C_sum_per_1k',  # pos1 mutation rate
+        'g_strand_G>T_sum_per_1k',  # pos2 mutation rate  
+        'g_strand_T>G_sum_per_1k'   # pos3 mutation rate
     ]
     titles = [
         'Total Mutations per 1000bp',
-        'G > A Mutation Rate per 1000bp',
-        'T > G Mutation Rate per 1000bp',
-        'T > C Mutation Rate per 1000bp'
+        'T > C Mutation Rate per 1000bp',
+        'G > T Mutation Rate per 1000bp',
+        'T > G Mutation Rate per 1000bp'
     ]
     
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))
@@ -96,7 +104,7 @@ def plot_spearman_correlations(data, output_path):
     plt.close()
 
 def plot_trendlines_main():
-    data = pd.read_csv("telomere_analysis.csv")
+    data = pd.read_csv("telomere_analysis_no_outliers.csv")
     # Plot the trendlines
     plot_trendlines(data, "trendline.png")
     # Plot the Spearman correlation graph

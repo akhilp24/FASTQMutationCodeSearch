@@ -54,20 +54,50 @@ def count_total_reads(file_path: str) -> int:
         count += 1
     return count
 
-def load_age_data():
+def load_age_data(metadata_file_path=None):
     """Load age data from greider_methods_table_s2.csv."""
     age_data = {}
-    with open('greider_methods_table_s2.csv', 'r') as f:
+    
+    # Try to find the metadata file
+    if metadata_file_path is None:
+        # Look in current directory first
+        if os.path.exists('greider_methods_table_s2.csv'):
+            metadata_file_path = 'greider_methods_table_s2.csv'
+        # Look in analysis directory
+        elif os.path.exists('../analysis/greider_methods_table_s2.csv'):
+            metadata_file_path = '../analysis/greider_methods_table_s2.csv'
+        # Look in parent directory
+        elif os.path.exists('analysis/greider_methods_table_s2.csv'):
+            metadata_file_path = 'analysis/greider_methods_table_s2.csv'
+        else:
+            raise FileNotFoundError("greider_methods_table_s2.csv not found in current directory, analysis directory, or parent directory")
+    
+    with open(metadata_file_path, 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
             fastq_name = row['fastq file name'].replace('_', '.')
             age_data[fastq_name] = row['Age (Years)']
     return age_data
 
-def load_length_data():
+def load_length_data(metadata_file_path=None):
     """Load length data from greider_methods_table_s2.csv."""
     length_data = {}
-    with open('greider_methods_table_s2.csv', 'r') as f:
+    
+    # Try to find the metadata file
+    if metadata_file_path is None:
+        # Look in current directory first
+        if os.path.exists('greider_methods_table_s2.csv'):
+            metadata_file_path = 'greider_methods_table_s2.csv'
+        # Look in analysis directory
+        elif os.path.exists('../analysis/greider_methods_table_s2.csv'):
+            metadata_file_path = '../analysis/greider_methods_table_s2.csv'
+        # Look in parent directory
+        elif os.path.exists('analysis/greider_methods_table_s2.csv'):
+            metadata_file_path = 'analysis/greider_methods_table_s2.csv'
+        else:
+            raise FileNotFoundError("greider_methods_table_s2.csv not found in current directory, analysis directory, or parent directory")
+    
+    with open(metadata_file_path, 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
             fastq_name = row['fastq file name'].replace('_', '.')
@@ -92,59 +122,154 @@ def get_sequence_files(directory: str):
     
     return sorted(sequence_files)  # Sort for consistent ordering
 
-def generate_csv(data_dir: str):
+def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None):
+    """
+    Generate CSV file from sequence data.
+    
+    Args:
+        data_dir: Directory containing sequence files
+        output_callback: Optional callback function to receive console output
+        metadata_file_path: Optional path to metadata file
+    """
     sequence_files = get_sequence_files(data_dir)
     
     if not sequence_files:
-        print(f"No FASTQ or FASTA files found in {data_dir} directory")
+        message = f"No FASTQ or FASTA files found in {data_dir} directory"
+        print(message)
+        if output_callback:
+            output_callback(message)
         return
     
     # Load age data
-    age_data = load_age_data()
-    length_data = load_length_data()
+    age_data = load_age_data(metadata_file_path)
+    length_data = load_length_data(metadata_file_path)
     
+    # patterns = {
+    #     'c_strand': "CCCTAACCCTAA",
+    #     'g_strand': "GGGTTAGGGTTA",
+    #     'g_strand_mutations': {
+    #         'G>A_g1': "GGGTTAAGGTTA",
+    #         'G>A_g2': "GGGTTAGAGTTA",
+    #         'G>A_g3': "GGGTTAGGATTA",
+    #         'G>C_g1': "GGGTTACGGTTA",
+    #         'G>C_g2': "GGGTTAGCGTTA",
+    #         'G>C_g3': "GGGTTAGGCTTA",
+    #         'G>T_g1': "GGGTTATGGTTA",
+    #         'G>T_g2': "GGGTTAGTGTTA",
+    #         'G>T_g3': "GGGTTAGGTTTA",
+    #         'T>A_t1': "GGGTTAGGGATA",
+    #         'T>A_t2': "GGGTTAGGGTAA",
+    #         'T>C_t1': "GGGTCAGGGTTA",
+    #         'T>C_t2': "GGGTTACGGTTA",
+    #         'T>G_t1': "GGGTGAGGGTTA",
+    #         'T>G_t2': "GGGTTAGGGGTA",
+    #         'A>T_a1': "GGGTTAGGGTTT",
+    #         'A>G_a1': "GGGTTAGGGTTG",
+    #         'A>C_a1': "GGGTTAGGGTTC",
+    #     },
+    #     'c_strand_mutations': {
+    #         'C>A_c1': "CCCTAAACCTAA",
+    #         'C>A_c2': "CCCTAACACTAA",
+    #         'C>A_c3': "CCCTAACCATAA",
+    #         'C>G_c1': "CCCTAAGCCTAA",
+    #         'C>G_c2': "CCCTAACGCTAA",
+    #         'C>G_c3': "CCCTAACCGTAA",
+    #         'C>T_c1': "CCCTAATCCTAA",
+    #         'C>T_c2': "CCCTAACTCTAA",
+    #         'C>T_c3': "CCCTAACCTTAA",
+    #         'T>A_t1': "CCCTAACCCAAA",
+    #         'T>C_t1': "CCCTAACCCCAA",
+    #         'T>G_t1': "CCCTAACCCGAA",
+    #         'A>T_a1': "CCCTAACCCTTA",
+    #         'A>T_a2': "CCCTAACCCTAT",
+    #         'A>G_a1': "CCCTAACCCTGA",
+    #         'A>G_a2': "CCCTAACCCTAG",
+    #         'A>C_a1': "CCCTAACCCTCA",
+    #         'A>C_a2': "CCCTAACCCTAC",
+    #     },
+    #     # 'g_strand_frameshifts': {
+    #     #     'del_firstG': "GGGTTAGGTTAG",
+    #     #     'del_firstT': "GGGTTAGGGTAG",
+    #     #     'del_secondT': "GGGTTAGGGTAG",
+    #     #     'del_A': "GGGTTAGGGTTG",
+    #     #     'ins_G_pos1': "GGGTTAGGGGTTA",
+    #     #     'ins_G_pos4': "GGGTTAGGGTTA",
+    #     #     'ins_T_pos5': "GGGTTATGGGTTA",
+    #     #     'ins_A_pos6': "GGGTTAAGGGTTA",
+    #     #     'ins_G_pos7': "GGGTTAGGGGTTA",
+    #     #     'ins_T_pos10': "GGGTTAGGGTTTA",
+    #     #     'ins_A_pos12': "GGGTTAGGGTTAA",
+    #     #     'fs_GGTTA_to_GGTAG': "GGGTTAGGTAG",
+    #     #     'fs_slip_rep1': "GGGTTGGGTTA",
+    #     #     'fs_slip_rep2': "GGGTTAGGTTA",
+    #     # },
+    #     # 'c_strand_frameshifts': {
+    #     #     'del_firstC': "ACCTAACCCTAA",
+    #     #     'del_T': "CCCAACCCTAA",
+    #     #     'del_firstA': "CCCTACCCTAA",
+    #     #     'del_secondA': "CCCTACCTAA",
+    #     #     'del_midC': "CCCTAACCTAA",
+    #     #     'del_lastT': "CCCTAACCCAA",
+    #     #     'del_finalA': "CCCTAACCCTA",
+    #     #     'ins_C_pos1': "CCCCTAACCCTAA",
+    #     #     'ins_T_pos4': "CCCTAACCCTAA",
+    #     #     'ins_A_pos5': "CCCTAAACCCTAA",
+    #     #     'ins_A_pos6': "CCCTAAACCCTAA",
+    #     #     'ins_C_pos7': "CCCTAACCCCTAA",
+    #     #     'ins_T_pos10': "CCCTAACCCTTAA",
+    #     #     'ins_A_pos11': "CCCTAACCCTAAA",
+    #     #     'fs_delA_insT': "CCCTAACCCTATA",
+    #     #     'fs_shift_end': "CCCTAACCCTAG",
+    #     #     'fs_shift_mid': "CCCTAACGCTAA",
+    #     #     'fs_dup_partial': "CCCTAACCCCTAAA",
+    #     #     'fs_TAA_to_TAG': "CCCTAACCCTAG",
+    #     #     'fs_slip_rep1': "CCCTACCCTAA",
+    #     #     'fs_slip_rep2': "CCCTAACCTAA",
+    #     # },
+    # }
+
+    # 3x repeat patterns
     patterns = {
         'c_strand': "CCCTAACCCTAA",
         'g_strand': "GGGTTAGGGTTA",
         'g_strand_mutations': {
-            'G>A_g1': "GGGTTAAGGTTA",
-            'G>A_g2': "GGGTTAGAGTTA",
-            'G>A_g3': "GGGTTAGGATTA",
-            'G>C_g1': "GGGTTACGGTTA",
-            'G>C_g2': "GGGTTAGCGTTA",
-            'G>C_g3': "GGGTTAGGCTTA",
-            'G>T_g1': "GGGTTATGGTTA",
-            'G>T_g2': "GGGTTAGTGTTA",
-            'G>T_g3': "GGGTTAGGTTTA",
-            'T>A_t1': "GGGTTAGGGATA",
-            'T>A_t2': "GGGTTAGGGTAA",
-            'T>C_t1': "GGGTCAGGGTTA",
-            'T>C_t2': "GGGTTACGGTTA",
-            'T>G_t1': "GGGTGAGGGTTA",
-            'T>G_t2': "GGGTTAGGGGTA",
-            'A>T_a1': "GGGTTAGGGTTT",
-            'A>G_a1': "GGGTTAGGGTTG",
-            'A>C_a1': "GGGTTAGGGTTC",
+            'G>A_g1': "GGGTTAAGGTTAGGGTTA",
+            'G>A_g2': "GGGTTAGAGTTAGGGTTA",
+            'G>A_g3': "GGGTTAGGATTAGGGTTA",
+            'G>C_g1': "GGGTTACGGTTAGGGTTA",
+            'G>C_g2': "GGGTTAGCGTTAGGGTTA",
+            'G>C_g3': "GGGTTAGGCTTAGGGTTA",
+            'G>T_g1': "GGGTTATGGTTAGGGTTA",
+            'G>T_g2': "GGGTTAGTGTTAGGGTTA",
+            'G>T_g3': "GGGTTAGGTTTAGGGTTA",
+            'T>A_t1': "GGGTTAGGGATAGGGTTA",
+            'T>A_t2': "GGGTTAGGGTAAGGGTTA",
+            'T>C_t1': "GGGTTAGGGCTAGGGTTA", 
+            'T>C_t2': "GGGTTAGGGTCAGGGTTA",
+            'T>G_t1': "GGGTTAGGGGTAGGGTTA",
+            'T>G_t2': "GGGTTAGGGTGAGGGTTA",
+            'A>T_a1': "GGGTTAGGGTTTGGGTTA",
+            'A>G_a1': "GGGTTAGGGTTGGGGTTA",
+            'A>C_a1': "GGGTTAGGGTTCGGGTTA",
         },
         'c_strand_mutations': {
-            'C>A_c1': "CCCTAAACCTAA",
-            'C>A_c2': "CCCTAACACTAA",
-            'C>A_c3': "CCCTAACCATAA",
-            'C>G_c1': "CCCTAAGCCTAA",
-            'C>G_c2': "CCCTAACGCTAA",
-            'C>G_c3': "CCCTAACCGTAA",
-            'C>T_c1': "CCCTAATCCTAA",
-            'C>T_c2': "CCCTAACTCTAA",
-            'C>T_c3': "CCCTAACCTTAA",
-            'T>A_t1': "CCCTAACCCAAA",
-            'T>C_t1': "CCCTAACCCCAA",
-            'T>G_t1': "CCCTAACCCGAA",
-            'A>T_a1': "CCCTAACCCTTA",
-            'A>T_a2': "CCCTAACCCTAT",
-            'A>G_a1': "CCCTAACCCTGA",
-            'A>G_a2': "CCCTAACCCTAG",
-            'A>C_a1': "CCCTAACCCTCA",
-            'A>C_a2': "CCCTAACCCTAC",
+            'C>A_c1': "CCCTAAACCTAACCCTAA",
+            'C>A_c2': "CCCTAACACTAACCCTAA",
+            'C>A_c3': "CCCTAACCATAACCCTAA",
+            'C>G_c1': "CCCTAAGCCTAACCCTAA",
+            'C>G_c2': "CCCTAACGCTAACCCTAA",
+            'C>G_c3': "CCCTAACCGTAACCCTAA",
+            'C>T_c1': "CCCTAATCCTAACCCTAA",
+            'C>T_c2': "CCCTAACTCTAACCCTAA",
+            'C>T_c3': "CCCTAACCTTAACCCTAA",
+            'T>A_t1': "CCCTAACCCAAACCCTAA",
+            'T>C_t1': "CCCTAACCCCAACCCTAA",
+            'T>G_t1': "CCCTAACCCGAACCCTAA",
+            'A>T_a1': "CCCTAACCCAAACCCTAA",
+            'A>G_a1': "CCCTAACCCTGACCCTAA",
+            'A>G_a2': "CCCTAACCCTAGCCCTAA",
+            'A>C_a1': "CCCTAACCCTCACCCTAA",
+            'A>C_a2': "CCCTAACCCTACCCCTAA",
         },
         # 'g_strand_frameshifts': {
         #     'del_firstG': "GGGTTAGGTTAG",
@@ -186,7 +311,6 @@ def generate_csv(data_dir: str):
         #     'fs_slip_rep2': "CCCTAACCTAA",
         # },
     }
-    
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
         fieldnames = [
             'FileName', 'Age', 'Telomere_Length', 'Total_Reads',
@@ -464,21 +588,31 @@ def generate_csv(data_dir: str):
 
             writer.writerow(row)
             
-            print(f"\nProcessing {filename}:")
-            print(f"Age: {age}")
-            print(f"Telomere Length: {length}")
-            print(f"Total Reads: {total_reads}")
-            print(f"2x c-strand total: {c_strand_total}")
-            print(f"2x g-strand total: {g_strand_total}")
-            print(f"G-strand mutations total: {g_strand_mutations_total}")
-            print(f"C-strand mutations total: {c_strand_mutations_total}")
-            print(f"G-strand normalizer (2x repeats + mutations): {g_strand_normalizer}")
-            print(f"C-strand normalizer (2x repeats + mutations): {c_strand_normalizer}")
-            print(f"Total mutations found: {total_mutations}")
-            # print(f"Frameshifts - G-strand: {row.get('total_g_strand_frameshifts_per_1k', 0):.2f} per 1k reads")
-            # print(f"Frameshifts - C-strand: {row.get('total_c_strand_frameshifts_per_1k', 0):.2f} per 1k reads")
+            # Create output messages
+            messages = [
+                f"\nProcessing {filename}:",
+                f"Age: {age}",
+                f"Telomere Length: {length}",
+                f"Total Reads: {total_reads}",
+                f"2x c-strand total: {c_strand_total}",
+                f"2x g-strand total: {g_strand_total}",
+                f"G-strand mutations total: {g_strand_mutations_total}",
+                f"C-strand mutations total: {c_strand_mutations_total}",
+                f"G-strand normalizer (2x repeats + mutations): {g_strand_normalizer}",
+                f"C-strand normalizer (2x repeats + mutations): {c_strand_normalizer}",
+                f"Total mutations found: {total_mutations}",
+                # f"Frameshifts - G-strand: {row.get('total_g_strand_frameshifts_per_1k', 0):.2f} per 1k reads",
+                # f"Frameshifts - C-strand: {row.get('total_c_strand_frameshifts_per_1k', 0):.2f} per 1k reads"
+            ]
+            
             if counts['g_strand'] == 0 and counts['c_strand'] == 0:
-                print(f"Warning: No telomere sequences found in {filename}")
+                messages.append(f"Warning: No telomere sequences found in {filename}")
+            
+            # Print to console and send to callback
+            for message in messages:
+                print(message)
+                if output_callback:
+                    output_callback(message)
 
 if __name__ == "__main__":  
-    generate_csv()
+    generate_csv(".")

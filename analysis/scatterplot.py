@@ -9,7 +9,7 @@ df = pd.read_csv(csv_path)
 
 # Clean and filter data
 # Some columns may have missing or non-numeric values, so we coerce errors
-for col in ['Age', 'Telomere_Length', 'g_strand_mutations_T>C_t1_per_1k']:
+for col in ['Age', 'Telomere_Length', 'total_mutations_over_total_g_strand_2xrepeats_per_1k']:
     if col not in df.columns:
         raise ValueError(f"Column '{col}' not found in CSV.")
     df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -22,7 +22,12 @@ telomere_lengths = df['Telomere_Length']
 mutations = df['total_mutations_over_total_g_strand_2xrepeats_per_1k']
 
 plt.figure(figsize=(10, 7))
-sc = plt.scatter(ages, telomere_lengths, c=mutations, cmap='magma', s=60, edgecolor='k', alpha=0.8)
+# Create a custom colormap from green (low mutations) to red (high mutations)
+from matplotlib.colors import LinearSegmentedColormap
+colors = ['green', 'yellow', 'red']
+n_bins = 100
+cmap = LinearSegmentedColormap.from_list('green_to_red', colors, N=n_bins)
+sc = plt.scatter(ages, telomere_lengths, c=mutations, cmap=cmap, s=60, edgecolor='k', alpha=0.8)
 cbar = plt.colorbar(sc)
 cbar.set_label('total_mutations_over_total_g_strand_2xrepeats_per_1k')
 

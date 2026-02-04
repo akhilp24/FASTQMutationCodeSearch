@@ -1,12 +1,35 @@
 #!/usr/bin/env python3
 
 import gzip
+import json
 from collections import defaultdict
 import csv
 import os
 import numpy as np
 import glob
 import HTSeq
+
+
+def load_patterns(patterns_file_path=None):
+    """Load patterns and general_mutation_map from telomere_patterns.json."""
+    if patterns_file_path is None:
+        candidates = [
+            os.path.join(os.path.dirname(__file__), 'telomere_patterns.json'),
+            'telomere_patterns.json',
+            'analysis/telomere_patterns.json',
+        ]
+        for p in candidates:
+            if os.path.exists(p):
+                patterns_file_path = p
+                break
+        if patterns_file_path is None:
+            raise FileNotFoundError(
+                "telomere_patterns.json not found. Looked in: "
+                + ", ".join(candidates)
+            )
+    with open(patterns_file_path, 'r') as f:
+        data = json.load(f)
+    return data['patterns'], data['general_mutation_map']
 
 def read_sequence_file(file_path: str):
     """Read FASTQ or FASTA file and yield sequences."""
@@ -143,174 +166,10 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None):
     # Load age data
     age_data = load_age_data(metadata_file_path)
     length_data = load_length_data(metadata_file_path)
-    
-    # patterns = {
-    #     'c_strand': "CCCTAACCCTAA",
-    #     'g_strand': "GGGTTAGGGTTA",
-    #     'g_strand_mutations': {
-    #         'G>A_g1': "GGGTTAAGGTTA",
-    #         'G>A_g2': "GGGTTAGAGTTA",
-    #         'G>A_g3': "GGGTTAGGATTA",
-    #         'G>C_g1': "GGGTTACGGTTA",
-    #         'G>C_g2': "GGGTTAGCGTTA",
-    #         'G>C_g3': "GGGTTAGGCTTA",
-    #         'G>T_g1': "GGGTTATGGTTA",
-    #         'G>T_g2': "GGGTTAGTGTTA",
-    #         'G>T_g3': "GGGTTAGGTTTA",
-    #         'T>A_t1': "GGGTTAGGGATA",
-    #         'T>A_t2': "GGGTTAGGGTAA",
-    #         'T>C_t1': "GGGTCAGGGTTA",
-    #         'T>C_t2': "GGGTTACGGTTA",
-    #         'T>G_t1': "GGGTGAGGGTTA",
-    #         'T>G_t2': "GGGTTAGGGGTA",
-    #         'A>T_a1': "GGGTTAGGGTTT",
-    #         'A>G_a1': "GGGTTAGGGTTG",
-    #         'A>C_a1': "GGGTTAGGGTTC",
-    #     },
-    #     'c_strand_mutations': {
-    #         'C>A_c1': "CCCTAAACCTAA",
-    #         'C>A_c2': "CCCTAACACTAA",
-    #         'C>A_c3': "CCCTAACCATAA",
-    #         'C>G_c1': "CCCTAAGCCTAA",
-    #         'C>G_c2': "CCCTAACGCTAA",
-    #         'C>G_c3': "CCCTAACCGTAA",
-    #         'C>T_c1': "CCCTAATCCTAA",
-    #         'C>T_c2': "CCCTAACTCTAA",
-    #         'C>T_c3': "CCCTAACCTTAA",
-    #         'T>A_t1': "CCCTAACCCAAA",
-    #         'T>C_t1': "CCCTAACCCCAA",
-    #         'T>G_t1': "CCCTAACCCGAA",
-    #         'A>T_a1': "CCCTAACCCTTA",
-    #         'A>T_a2': "CCCTAACCCTAT",
-    #         'A>G_a1': "CCCTAACCCTGA",
-    #         'A>G_a2': "CCCTAACCCTAG",
-    #         'A>C_a1': "CCCTAACCCTCA",
-    #         'A>C_a2': "CCCTAACCCTAC",
-    #     },
-    #     # 'g_strand_frameshifts': {
-    #     #     'del_firstG': "GGGTTAGGTTAG",
-    #     #     'del_firstT': "GGGTTAGGGTAG",
-    #     #     'del_secondT': "GGGTTAGGGTAG",
-    #     #     'del_A': "GGGTTAGGGTTG",
-    #     #     'ins_G_pos1': "GGGTTAGGGGTTA",
-    #     #     'ins_G_pos4': "GGGTTAGGGTTA",
-    #     #     'ins_T_pos5': "GGGTTATGGGTTA",
-    #     #     'ins_A_pos6': "GGGTTAAGGGTTA",
-    #     #     'ins_G_pos7': "GGGTTAGGGGTTA",
-    #     #     'ins_T_pos10': "GGGTTAGGGTTTA",
-    #     #     'ins_A_pos12': "GGGTTAGGGTTAA",
-    #     #     'fs_GGTTA_to_GGTAG': "GGGTTAGGTAG",
-    #     #     'fs_slip_rep1': "GGGTTGGGTTA",
-    #     #     'fs_slip_rep2': "GGGTTAGGTTA",
-    #     # },
-    #     # 'c_strand_frameshifts': {
-    #     #     'del_firstC': "ACCTAACCCTAA",
-    #     #     'del_T': "CCCAACCCTAA",
-    #     #     'del_firstA': "CCCTACCCTAA",
-    #     #     'del_secondA': "CCCTACCTAA",
-    #     #     'del_midC': "CCCTAACCTAA",
-    #     #     'del_lastT': "CCCTAACCCAA",
-    #     #     'del_finalA': "CCCTAACCCTA",
-    #     #     'ins_C_pos1': "CCCCTAACCCTAA",
-    #     #     'ins_T_pos4': "CCCTAACCCTAA",
-    #     #     'ins_A_pos5': "CCCTAAACCCTAA",
-    #     #     'ins_A_pos6': "CCCTAAACCCTAA",
-    #     #     'ins_C_pos7': "CCCTAACCCCTAA",
-    #     #     'ins_T_pos10': "CCCTAACCCTTAA",
-    #     #     'ins_A_pos11': "CCCTAACCCTAAA",
-    #     #     'fs_delA_insT': "CCCTAACCCTATA",
-    #     #     'fs_shift_end': "CCCTAACCCTAG",
-    #     #     'fs_shift_mid': "CCCTAACGCTAA",
-    #     #     'fs_dup_partial': "CCCTAACCCCTAAA",
-    #     #     'fs_TAA_to_TAG': "CCCTAACCCTAG",
-    #     #     'fs_slip_rep1': "CCCTACCCTAA",
-    #     #     'fs_slip_rep2': "CCCTAACCTAA",
-    #     # },
-    # }
 
-    # 3x repeat patterns
-    patterns = {
-        'c_strand': "CCCTAACCCTAA",
-        'g_strand': "GGGTTAGGGTTA",
-        'g_strand_mutations': {
-            'G>A_g1': "GGGTTAAGGTTAGGGTTA",
-            'G>A_g2': "GGGTTAGAGTTAGGGTTA",
-            'G>A_g3': "GGGTTAGGATTAGGGTTA",
-            'G>C_g1': "GGGTTACGGTTAGGGTTA",
-            'G>C_g2': "GGGTTAGCGTTAGGGTTA",
-            'G>C_g3': "GGGTTAGGCTTAGGGTTA",
-            'G>T_g1': "GGGTTATGGTTAGGGTTA",
-            'G>T_g2': "GGGTTAGTGTTAGGGTTA",
-            'G>T_g3': "GGGTTAGGTTTAGGGTTA",
-            'T>A_t1': "GGGTTAGGGATAGGGTTA",
-            'T>A_t2': "GGGTTAGGGTAAGGGTTA",
-            'T>C_t1': "GGGTTAGGGCTAGGGTTA", 
-            'T>C_t2': "GGGTTAGGGTCAGGGTTA",
-            'T>G_t1': "GGGTTAGGGGTAGGGTTA",
-            'T>G_t2': "GGGTTAGGGTGAGGGTTA",
-            'A>T_a1': "GGGTTAGGGTTTGGGTTA",
-            'A>G_a1': "GGGTTAGGGTTGGGGTTA",
-            'A>C_a1': "GGGTTAGGGTTCGGGTTA",
-        },
-        'c_strand_mutations': {
-            'C>A_c1': "CCCTAAACCTAACCCTAA",
-            'C>A_c2': "CCCTAACACTAACCCTAA",
-            'C>A_c3': "CCCTAACCATAACCCTAA",
-            'C>G_c1': "CCCTAAGCCTAACCCTAA",
-            'C>G_c2': "CCCTAACGCTAACCCTAA",
-            'C>G_c3': "CCCTAACCGTAACCCTAA",
-            'C>T_c1': "CCCTAATCCTAACCCTAA",
-            'C>T_c2': "CCCTAACTCTAACCCTAA",
-            'C>T_c3': "CCCTAACCTTAACCCTAA",
-            'T>A_t1': "CCCTAACCCAAACCCTAA",
-            'T>C_t1': "CCCTAACCCCAACCCTAA",
-            'T>G_t1': "CCCTAACCCGAACCCTAA",
-            'A>T_a1': "CCCTAACCCAAACCCTAA",
-            'A>G_a1': "CCCTAACCCTGACCCTAA",
-            'A>G_a2': "CCCTAACCCTAGCCCTAA",
-            'A>C_a1': "CCCTAACCCTCACCCTAA",
-            'A>C_a2': "CCCTAACCCTACCCCTAA",
-        },
-        # 'g_strand_frameshifts': {
-        #     'del_firstG': "GGGTTAGGTTAG",
-        #     'del_firstT': "GGGTTAGGGTAG",
-        #     'del_secondT': "GGGTTAGGGTAG",
-        #     'del_A': "GGGTTAGGGTTG",
-        #     'ins_G_pos1': "GGGTTAGGGGTTA",
-        #     'ins_G_pos4': "GGGTTAGGGTTA",
-        #     'ins_T_pos5': "GGGTTATGGGTTA",
-        #     'ins_A_pos6': "GGGTTAAGGGTTA",
-        #     'ins_G_pos7': "GGGTTAGGGGTTA",
-        #     'ins_T_pos10': "GGGTTAGGGTTTA",
-        #     'ins_A_pos12': "GGGTTAGGGTTAA",
-        #     'fs_GGTTA_to_GGTAG': "GGGTTAGGTAG",
-        #     'fs_slip_rep1': "GGGTTGGGTTA",
-        #     'fs_slip_rep2': "GGGTTAGGTTA",
-        # },
-        # 'c_strand_frameshifts': {
-        #     'del_firstC': "ACCTAACCCTAA",
-        #     'del_T': "CCCAACCCTAA",
-        #     'del_firstA': "CCCTACCCTAA",
-        #     'del_secondA': "CCCTACCTAA",
-        #     'del_midC': "CCCTAACCTAA",
-        #     'del_lastT': "CCCTAACCCAA",
-        #     'del_finalA': "CCCTAACCCTA",
-        #     'ins_C_pos1': "CCCCTAACCCTAA",
-        #     'ins_T_pos4': "CCCTAACCCTAA",
-        #     'ins_A_pos5': "CCCTAAACCCTAA",
-        #     'ins_A_pos6': "CCCTAAACCCTAA",
-        #     'ins_C_pos7': "CCCTAACCCCTAA",
-        #     'ins_T_pos10': "CCCTAACCCTTAA",
-        #     'ins_A_pos11': "CCCTAACCCTAAA",
-        #     'fs_delA_insT': "CCCTAACCCTATA",
-        #     'fs_shift_end': "CCCTAACCCTAG",
-        #     'fs_shift_mid': "CCCTAACGCTAA",
-        #     'fs_dup_partial': "CCCTAACCCCTAAA",
-        #     'fs_TAA_to_TAG': "CCCTAACCCTAG",
-        #     'fs_slip_rep1': "CCCTACCCTAA",
-        #     'fs_slip_rep2': "CCCTAACCTAA",
-        # },
-    }
+    # Load patterns from reference file
+    patterns, general_mutation_map = load_patterns()
+
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
         fieldnames = [
             'FileName', 'Age', 'Telomere_Length', 'Total_Reads',
@@ -326,30 +185,6 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None):
         fieldnames.extend([f"{k}_per_1k" for k in mutation_keys])
 
         # --- Add general mutation per_1k columns ---
-        general_mutation_map = {
-            'g_strand': {
-                'G>A': ['G>A_g1', 'G>A_g2', 'G>A_g3'],
-                'G>C': ['G>C_g1', 'G>C_g2', 'G>C_g3'],
-                'G>T': ['G>T_g1', 'G>T_g2', 'G>T_g3'],
-                'T>A': ['T>A_t1', 'T>A_t2'],
-                'T>C': ['T>C_t1', 'T>C_t2'],
-                'T>G': ['T>G_t1', 'T>G_t2'],
-                'A>T': ['A>T_a1'],
-                'A>G': ['A>G_a1'],
-                'A>C': ['A>C_a1'],
-            },
-            'c_strand': {
-                'C>A': ['C>A_c1', 'C>A_c2', 'C>A_c3'],
-                'C>G': ['C>G_c1', 'C>G_c2', 'C>G_c3'],
-                'C>T': ['C>T_c1', 'C>T_c2', 'C>T_c3'],
-                'T>A': ['T>A_t1'],
-                'T>C': ['T>C_t1'],
-                'T>G': ['T>G_t1'],
-                'A>T': ['A>T_a1', 'A>T_a2'],
-                'A>G': ['A>G_a1', 'A>G_a2'],
-                'A>C': ['A>C_a1', 'A>C_a2'],
-            }
-        }
         general_mutation_headers = []
         for strand, mutmap in general_mutation_map.items():
             for mut in mutmap:

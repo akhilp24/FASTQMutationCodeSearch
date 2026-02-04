@@ -1,7 +1,27 @@
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
+import json
+import os
 from scipy.stats import spearmanr, linregress
+
+
+def _get_patterns_version():
+    """Load version from telomere_patterns.json for use in graph titles."""
+    try:
+        candidates = [
+            os.path.join(os.path.dirname(__file__), 'telomere_patterns.json'),
+            'telomere_patterns.json',
+            'analysis/telomere_patterns.json',
+        ]
+        for p in candidates:
+            if os.path.exists(p):
+                with open(p) as f:
+                    return json.load(f).get('version', 'unknown')
+    except Exception:
+        pass
+    return 'unknown'
+
 
 def plot_trendlines(data, output_path):
     # Set up the plotting style
@@ -10,7 +30,8 @@ def plot_trendlines(data, output_path):
     
     # Create a 2x2 subplot layout
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))
-    fig.suptitle('Mutation Rates vs Age', fontsize=16, fontweight='bold')
+    version = _get_patterns_version()
+    fig.suptitle(f'Mutation Rates vs Age [{version}]', fontsize=16, fontweight='bold')
     
     # Define the variables to plot
     variables = [
@@ -82,7 +103,8 @@ def plot_spearman_correlations(data, output_path):
     ]
     
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))
-    fig.suptitle("Spearman's Rank Correlation: Mutation Rates vs Age", fontsize=16, fontweight='bold')
+    version = _get_patterns_version()
+    fig.suptitle(f"Spearman's Rank Correlation: Mutation Rates vs Age [{version}]", fontsize=16, fontweight='bold')
     
     for i, (var, title) in enumerate(zip(variables, titles)):
         row = i // 2

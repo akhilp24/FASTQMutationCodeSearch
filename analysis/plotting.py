@@ -2,11 +2,29 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import os
+import json
 import seaborn as sns
 from scipy.optimize import curve_fit
 from scipy import stats
 
 import numbers
+
+
+def _get_patterns_version():
+    """Load version from telomere_patterns.json for use in graph titles."""
+    try:
+        candidates = [
+            os.path.join(os.path.dirname(__file__), 'telomere_patterns.json'),
+            'telomere_patterns.json',
+            'analysis/telomere_patterns.json',
+        ]
+        for p in candidates:
+            if os.path.exists(p):
+                with open(p) as f:
+                    return json.load(f).get('version', 'unknown')
+    except Exception:
+        pass
+    return 'unknown'
 
 def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path):
     # Set seaborn style for better-looking plots
@@ -80,7 +98,8 @@ def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_
     # Title with age and filename
     age = row['Age'] if 'Age' in row else 'N/A'
     filename = row['FileName'] if 'FileName' in row else 'sample'
-    title = f"Mutational Signatures by Position and Strand Context\nFile: {filename} | Age: {age} years"
+    version = _get_patterns_version()
+    title = f"Mutational Signatures by Position and Strand Context [{version}]\nFile: {filename} | Age: {age} years"
     ax.set_title(title, fontsize=18, fontweight='bold', pad=30)
     
     # Improve layout
@@ -186,7 +205,8 @@ def plot_spearman_with_age(csv_path):
             sns.regplot(x=x, y=y, scatter=False, ci=None, line_kws={'color': 'red', 'linestyle': '--'}, ax=ax)
         ax.set_xlabel('Age (years)', fontsize=12)
         ax.set_ylabel(col, fontsize=12)
-        ax.set_title(f"Spearman's ρ = {corr:.2f} (p={pval:.2g})\n{col} vs Age", fontsize=14)
+        version = _get_patterns_version()
+        ax.set_title(f"Spearman's ρ = {corr:.2f} (p={pval:.2g})\n{col} vs Age [{version}]", fontsize=14)
         plt.tight_layout()
         # Save plot
         safe_col = col.replace('/', '_').replace(' ', '_').replace('>', 'to').replace('<', 'lt').replace(':', '_')
@@ -228,7 +248,8 @@ def plot_composite_score(csv_path, target_col='Age'):
     sns.regplot(x=df[target_col], y=df['composite_score'], scatter=False, ci=None, line_kws={'color': 'red', 'linestyle': '--'}, ax=ax)
     ax.set_xlabel(target_col, fontsize=12)
     ax.set_ylabel('Composite Score', fontsize=12)
-    ax.set_title(f"Composite Score vs {target_col}\nSpearman's ρ = {r:.2f} (p={p:.2g})", fontsize=14)
+    version = _get_patterns_version()
+    ax.set_title(f"Composite Score vs {target_col} [{version}]\nSpearman's ρ = {r:.2f} (p={p:.2g})", fontsize=14)
     plt.tight_layout()
     # Save plot
     output_dir = "spearman's plots"
@@ -301,7 +322,8 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age'):
     # Plot heatmap of r values
     plt.figure(figsize=(max(8, len(mutation_cols) * 0.4), 2.5))
     sns.heatmap(r_df.T, annot=True, cmap='coolwarm', center=0, cbar_kws={'label': "Spearman's r"})
-    plt.title(f"Spearman r values: Normalized Mutations vs {target_col}")
+    version = _get_patterns_version()
+    plt.title(f"Spearman r values: Normalized Mutations vs {target_col} [{version}]")
     plt.yticks(rotation=0)
     plt.tight_layout()
     output_dir = "spearman's plots"
@@ -408,7 +430,8 @@ def plot_pairwise_r_heatmap(csv_path):
     # Cross out the diagonal
     for i in range(n):
         ax.add_patch(plt.Rectangle((i, i), 1, 1, fill=False, edgecolor='black', lw=2, hatch='xx'))
-    plt.title("Pairwise Spearman r Heatmap (Normalized Mutations, Age, Telomere)", fontsize=14)
+    version = _get_patterns_version()
+    plt.title(f"Pairwise Spearman r Heatmap (Normalized Mutations, Age, Telomere) [{version}]", fontsize=14)
     plt.xticks(rotation=45, ha='right', fontsize=9)
     plt.yticks(fontsize=9)
     plt.tight_layout()
@@ -581,7 +604,8 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots"):
             
             plt.xlabel('Age (years)', fontsize=12)
             plt.ylabel('Telomere Length (bp)', fontsize=12)
-            plt.title('Curve Fitting: Telomere Length vs Age', fontsize=14, fontweight='bold')
+            version = _get_patterns_version()
+            plt.title(f'Curve Fitting: Telomere Length vs Age [{version}]', fontsize=14, fontweight='bold')
             plt.legend()
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
@@ -712,7 +736,8 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots"):
                 
                 plt.xlabel('Age (years)', fontsize=12)
                 plt.ylabel(col.replace('_', ' ').title(), fontsize=12)
-                plt.title(f'Curve Fitting: {col.replace("_", " ").title()} vs Age', fontsize=14, fontweight='bold')
+                version = _get_patterns_version()
+                plt.title(f'Curve Fitting: {col.replace("_", " ").title()} vs Age [{version}]', fontsize=14, fontweight='bold')
                 plt.legend()
                 plt.grid(True, alpha=0.3)
                 plt.tight_layout()

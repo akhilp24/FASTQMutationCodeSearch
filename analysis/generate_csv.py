@@ -132,7 +132,7 @@ def get_sequence_files(directory: str):
     
     return sorted(sequence_files)  # Sort for consistent ordering
 
-def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, patterns_file_path=None):
+def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, patterns_file_path=None, output_csv_path=None):
     """
     Generate CSV file from sequence data.
 
@@ -141,9 +141,16 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
         output_callback: Optional callback function to receive console output
         metadata_file_path: Optional path to metadata file
         patterns_file_path: Path to patterns JSON (e.g. from main.py)
+        output_csv_path: Optional path for output CSV; if None, writes to 'telomere_analysis.csv' in cwd.
+                         If provided, parent directory is created if needed.
     """
     if patterns_file_path is None:
         raise ValueError("patterns_file_path is required; pass it from main.py.")
+    csv_path = output_csv_path if output_csv_path is not None else 'telomere_analysis.csv'
+    if output_csv_path is not None:
+        parent = os.path.dirname(csv_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
     sequence_files = get_sequence_files(data_dir)
     
     if not sequence_files:
@@ -160,7 +167,7 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
     # Load patterns from reference file
     patterns, general_mutation_map, patterns_version = load_patterns(patterns_file_path)
 
-    with open('telomere_analysis.csv', 'w', newline='') as csvfile:
+    with open(csv_path, 'w', newline='') as csvfile:
         fieldnames = [
             'FileName', 'Age', 'Telomere_Length', 'Total_Reads',
             'c_strand', 'g_strand',

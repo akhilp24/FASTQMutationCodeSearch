@@ -31,10 +31,8 @@ def plot_trendlines(data, output_path, variables, titles, version):
         plot_data = data.dropna(subset=['Age', var])
         
         if len(plot_data) > 0:
-            # Create scatter plot
+           
             sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.6)
-            
-            # Add trendline and calculate R-squared
             if len(plot_data) > 1:
                 sns.regplot(data=plot_data, x='Age', y=var, ax=ax, 
                           scatter=False, line_kws={'color': 'blue', 'linestyle': '--'})

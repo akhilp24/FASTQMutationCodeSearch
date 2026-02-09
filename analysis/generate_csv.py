@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import gzip
-import json
 from collections import defaultdict
 import csv
 import os
@@ -9,27 +8,8 @@ import numpy as np
 import glob
 import HTSeq
 
+from patterns_config import load_patterns
 
-def load_patterns(patterns_file_path=None):
-    """Load patterns and general_mutation_map from telomere_patterns.json."""
-    if patterns_file_path is None:
-        candidates = [
-            os.path.join(os.path.dirname(__file__), 'telomere_patterns.json'),
-            'telomere_patterns.json',
-            'analysis/telomere_patterns.json',
-        ]
-        for p in candidates:
-            if os.path.exists(p):
-                patterns_file_path = p
-                break
-        if patterns_file_path is None:
-            raise FileNotFoundError(
-                "telomere_patterns.json not found. Looked in: "
-                + ", ".join(candidates)
-            )
-    with open(patterns_file_path, 'r') as f:
-        data = json.load(f)
-    return data['patterns'], data['general_mutation_map']
 
 def read_sequence_file(file_path: str):
     """Read FASTQ or FASTA file and yield sequences."""
@@ -168,7 +148,7 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None):
     length_data = load_length_data(metadata_file_path)
 
     # Load patterns from reference file
-    patterns, general_mutation_map = load_patterns()
+    patterns, general_mutation_map, patterns_version = load_patterns()
 
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
         fieldnames = [
@@ -429,12 +409,12 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None):
                 f"Age: {age}",
                 f"Telomere Length: {length}",
                 f"Total Reads: {total_reads}",
-                f"2x c-strand total: {c_strand_total}",
-                f"2x g-strand total: {g_strand_total}",
+                f"{patterns_version} c-strand total: {c_strand_total}",
+                f"{patterns_version} g-strand total: {g_strand_total}",
                 f"G-strand mutations total: {g_strand_mutations_total}",
                 f"C-strand mutations total: {c_strand_mutations_total}",
-                f"G-strand normalizer (2x repeats + mutations): {g_strand_normalizer}",
-                f"C-strand normalizer (2x repeats + mutations): {c_strand_normalizer}",
+                f"G-strand normalizer ({patterns_version} + mutations): {g_strand_normalizer}",
+                f"C-strand normalizer ({patterns_version} + mutations): {c_strand_normalizer}",
                 f"Total mutations found: {total_mutations}",
                 # f"Frameshifts - G-strand: {row.get('total_g_strand_frameshifts_per_1k', 0):.2f} per 1k reads",
                 # f"Frameshifts - C-strand: {row.get('total_c_strand_frameshifts_per_1k', 0):.2f} per 1k reads"

@@ -1,51 +1,18 @@
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
-import json
-import os
 from scipy.stats import spearmanr, linregress
 
-
-def _get_patterns_version():
-    """Load version from telomere_patterns.json for use in graph titles."""
-    try:
-        candidates = [
-            os.path.join(os.path.dirname(__file__), 'telomere_patterns.json'),
-            'telomere_patterns.json',
-            'analysis/telomere_patterns.json',
-        ]
-        for p in candidates:
-            if os.path.exists(p):
-                with open(p) as f:
-                    return json.load(f).get('version', 'unknown')
-    except Exception:
-        pass
-    return 'unknown'
+from patterns_config import get_patterns_version
 
 
-def plot_trendlines(data, output_path):
-    # Set up the plotting style
+def plot_trendlines(data, output_path, variables, titles):
     sns.set_style("whitegrid")
     sns.set_palette("husl")
     
-    # Create a 2x2 subplot layout
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))
-    version = _get_patterns_version()
+    version = get_patterns_version()
     fig.suptitle(f'Mutation Rates vs Age [{version}]', fontsize=16, fontweight='bold')
-    
-    # Define the variables to plot
-    variables = [
-         'total_mutations_over_total_g_strand_2xrepeats_per_1k',
-        'g_strand_T>C_sum_per_1k',  # pos1 mutation rate
-        'g_strand_G>T_sum_per_1k',  # pos2 mutation rate  
-        'g_strand_T>G_sum_per_1k'   # pos3 mutation rate
-    ]
-    titles = [
-        'Total Mutations per 1000bp',
-        'T > C Mutation Rate per 1000bp',
-        'G > T Mutation Rate per 1000bp',
-        'T > G Mutation Rate per 1000bp'
-    ]
     
     # Plot each variable
     for i, (var, title) in enumerate(zip(variables, titles)):
@@ -85,25 +52,12 @@ def plot_trendlines(data, output_path):
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
-def plot_spearman_correlations(data, output_path):
+def plot_spearman_correlations(data, output_path, variables, titles):
     sns.set_style("whitegrid")
     sns.set_palette("husl")
     
-    variables = [
-         'total_mutations_over_total_g_strand_2xrepeats_per_1k',
-        'g_strand_T>C_sum_per_1k',  # pos1 mutation rate
-        'g_strand_G>T_sum_per_1k',  # pos2 mutation rate  
-        'g_strand_T>G_sum_per_1k'   # pos3 mutation rate
-    ]
-    titles = [
-        'Total Mutations per 1000bp',
-        'T > C Mutation Rate per 1000bp',
-        'G > T Mutation Rate per 1000bp',
-        'T > G Mutation Rate per 1000bp'
-    ]
-    
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))
-    version = _get_patterns_version()
+    version = get_patterns_version()
     fig.suptitle(f"Spearman's Rank Correlation: Mutation Rates vs Age [{version}]", fontsize=16, fontweight='bold')
     
     for i, (var, title) in enumerate(zip(variables, titles)):
@@ -125,14 +79,38 @@ def plot_spearman_correlations(data, output_path):
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
-def plot_trendlines_main():
-    data = pd.read_csv("telomere_analysis_no_outliers.csv")
-    # Plot the trendlines
-    plot_trendlines(data, "trendline.png")
-    # Plot the Spearman correlation graph
-    plot_spearman_correlations(data, "spearman_correlation.png")
-    print("Trendline plot saved as 'trendline.png'")
-    print("Spearman correlation plot saved as 'spearman_correlation.png'")
+def plot_trendlines_main(
+    csv_path,
+    trendline_output_path,
+    spearman_output_path,
+    variables,
+    titles,
+):
+    data = pd.read_csv(csv_path)
+    plot_trendlines(data, trendline_output_path, variables, titles)
+    plot_spearman_correlations(data, spearman_output_path, variables, titles)
+    print(f"Trendline plot saved as '{trendline_output_path}'")
+    print(f"Spearman correlation plot saved as '{spearman_output_path}'")
+
 
 if __name__ == "__main__":
-    plot_trendlines_main()
+    # When run directly, pass config from here (or run via main.py for single source of truth).
+    import os
+    _dir = os.path.dirname(__file__)
+    plot_trendlines_main(
+        csv_path=os.path.join(_dir, "telomere_analysis_2x_repeat_feb4_2026.csv"),
+        trendline_output_path=os.path.join(_dir, "trendline.png"),
+        spearman_output_path=os.path.join(_dir, "spearman_correlation.png"),
+        variables=[
+            "total_mutations_over_total_g_strand_2xrepeats_per_1k",
+            "g_strand_T>C_sum_per_1k",
+            "g_strand_G>T_sum_per_1k",
+            "g_strand_T>G_sum_per_1k",
+        ],
+        titles=[
+            "Total Mutations per 1000bp",
+            "T > C Mutation Rate per 1000bp",
+            "G > T Mutation Rate per 1000bp",
+            "T > G Mutation Rate per 1000bp",
+        ],
+    )

@@ -1,17 +1,24 @@
+import json
 import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr, linregress
 
-from patterns_config import get_patterns_version
+
+def _get_patterns_version(patterns_file_path):
+    """Read version string from patterns JSON (path passed from main.py)."""
+    try:
+        with open(patterns_file_path) as f:
+            return json.load(f).get('version', 'unknown')
+    except Exception:
+        return 'unknown'
 
 
-def plot_trendlines(data, output_path, variables, titles):
+def plot_trendlines(data, output_path, variables, titles, version):
     sns.set_style("whitegrid")
     sns.set_palette("husl")
     
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))
-    version = get_patterns_version()
     fig.suptitle(f'Mutation Rates vs Age [{version}]', fontsize=16, fontweight='bold')
     
     # Plot each variable
@@ -52,12 +59,11 @@ def plot_trendlines(data, output_path, variables, titles):
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
-def plot_spearman_correlations(data, output_path, variables, titles):
+def plot_spearman_correlations(data, output_path, variables, titles, version):
     sns.set_style("whitegrid")
     sns.set_palette("husl")
     
     fig, axes = plt.subplots(2, 2, figsize=(20, 12))
-    version = get_patterns_version()
     fig.suptitle(f"Spearman's Rank Correlation: Mutation Rates vs Age [{version}]", fontsize=16, fontweight='bold')
     
     for i, (var, title) in enumerate(zip(variables, titles)):
@@ -85,32 +91,19 @@ def plot_trendlines_main(
     spearman_output_path,
     variables,
     titles,
+    patterns_file_path,
 ):
+    version = _get_patterns_version(patterns_file_path)
     data = pd.read_csv(csv_path)
-    plot_trendlines(data, trendline_output_path, variables, titles)
-    plot_spearman_correlations(data, spearman_output_path, variables, titles)
+    plot_trendlines(data, trendline_output_path, variables, titles, version)
+    plot_spearman_correlations(data, spearman_output_path, variables, titles, version)
     print(f"Trendline plot saved as '{trendline_output_path}'")
     print(f"Spearman correlation plot saved as '{spearman_output_path}'")
 
 
 if __name__ == "__main__":
-    # When run directly, pass config from here (or run via main.py for single source of truth).
-    import os
-    _dir = os.path.dirname(__file__)
-    plot_trendlines_main(
-        csv_path=os.path.join(_dir, "telomere_analysis_2x_repeat_feb4_2026.csv"),
-        trendline_output_path=os.path.join(_dir, "trendline.png"),
-        spearman_output_path=os.path.join(_dir, "spearman_correlation.png"),
-        variables=[
-            "total_mutations_over_total_g_strand_2xrepeats_per_1k",
-            "g_strand_T>C_sum_per_1k",
-            "g_strand_G>T_sum_per_1k",
-            "g_strand_T>G_sum_per_1k",
-        ],
-        titles=[
-            "Total Mutations per 1000bp",
-            "T > C Mutation Rate per 1000bp",
-            "G > T Mutation Rate per 1000bp",
-            "T > G Mutation Rate per 1000bp",
-        ],
+    raise SystemExit(
+        "This module is intended to be run via analysis/main.py so all inputs/outputs\n"
+        "and variable/title lists live in one place.\n"
+        "Run: python analysis/main.py"
     )

@@ -1,3 +1,4 @@
+import json
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -8,10 +9,17 @@ from scipy import stats
 
 import numbers
 
-from patterns_config import get_patterns_version
+
+def _get_patterns_version(patterns_file_path):
+    """Read version string from patterns JSON (path passed from main.py)."""
+    try:
+        with open(patterns_file_path) as f:
+            return json.load(f).get('version', 'unknown')
+    except Exception:
+        return 'unknown'
 
 
-def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path):
+def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path, version):
     # Set seaborn style for better-looking plots
     sns.set_style("whitegrid")
     sns.set_palette("husl")
@@ -83,7 +91,6 @@ def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_
     # Title with age and filename
     age = row['Age'] if 'Age' in row else 'N/A'
     filename = row['FileName'] if 'FileName' in row else 'sample'
-    version = get_patterns_version()
     title = f"Mutational Signatures by Position and Strand Context [{version}]\nFile: {filename} | Age: {age} years"
     ax.set_title(title, fontsize=18, fontweight='bold', pad=30)
     
@@ -94,9 +101,10 @@ def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
-def plot_mutational_signatures(csv_path):
+def plot_mutational_signatures(csv_path, patterns_file_path):
     # Set global seaborn style
     sns.set_theme(style="whitegrid", font_scale=1.1)
+    version = _get_patterns_version(patterns_file_path)
     
     df = pd.read_csv(csv_path)
     mutation_types = [
@@ -140,9 +148,9 @@ def plot_mutational_signatures(csv_path):
         filename = str(row['FileName']) if 'FileName' in row else f'sample_{idx}'
         filename_base = os.path.splitext(filename)[0]
         output_path = os.path.join('plots', f'{filename_base}.png')
-        plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path)
+        plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path, version)
 
-def plot_spearman_with_age(csv_path):
+def plot_spearman_with_age(csv_path, patterns_file_path):
     """
     For each numeric column in the CSV (except 'Age'), plot a scatter plot with Age on the x-axis and the column on the y-axis,
     calculate and display the Spearman correlation, and save each plot in 'spearman's plots' directory.
@@ -184,7 +192,7 @@ def plot_spearman_with_age(csv_path):
             sns.regplot(x=x, y=y, scatter=False, ci=None, line_kws={'color': 'red', 'linestyle': '--'}, ax=ax)
         ax.set_xlabel('Age (years)', fontsize=12)
         ax.set_ylabel(col, fontsize=12)
-        version = get_patterns_version()
+        version = _get_patterns_version(patterns_file_path)
         ax.set_title(f"Spearman's ρ = {corr:.2f} (p={pval:.2g})\n{col} vs Age [{version}]", fontsize=14)
         plt.tight_layout()
         # Save plot
@@ -198,7 +206,7 @@ def plot_spearman_with_age(csv_path):
     results_df.to_csv(results_csv_path, index=False)
 
 # --- Composite Score Plotting ---
-def plot_composite_score(csv_path, target_col='Age'):
+def plot_composite_score(csv_path, target_col='Age', patterns_file_path=None):
     """
     Calculate a composite score from selected columns, plot it against the target column,
     and display the Spearman correlation.
@@ -225,7 +233,7 @@ def plot_composite_score(csv_path, target_col='Age'):
     sns.regplot(x=df[target_col], y=df['composite_score'], scatter=False, ci=None, line_kws={'color': 'red', 'linestyle': '--'}, ax=ax)
     ax.set_xlabel(target_col, fontsize=12)
     ax.set_ylabel('Composite Score', fontsize=12)
-    version = get_patterns_version()
+    version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
     ax.set_title(f"Composite Score vs {target_col} [{version}]\nSpearman's ρ = {r:.2f} (p={p:.2g})", fontsize=14)
     plt.tight_layout()
     # Save plot
@@ -237,18 +245,18 @@ def plot_composite_score(csv_path, target_col='Age'):
     print(f"Composite score plot saved as {output_path}")
 
 
-def plot_composite_score_main():
-    plot_composite_score('telomere_analysis.csv', target_col='Age')
+def plot_composite_score_main(patterns_file_path):
+    plot_composite_score('telomere_analysis.csv', target_col='Age', patterns_file_path=patterns_file_path)
 
-def plot_mutational_signatures_main():
-    plot_mutational_signatures('telomere_analysis.csv')
+def plot_mutational_signatures_main(patterns_file_path):
+    plot_mutational_signatures('telomere_analysis.csv', patterns_file_path)
     print("Mutational signature plots saved in 'plots/' directory")
 
-def plot_spearman_with_age_main():
-    plot_spearman_with_age('telomere_analysis.csv')
+def plot_spearman_with_age_main(patterns_file_path):
+    plot_spearman_with_age('telomere_analysis.csv', patterns_file_path)
     print("Spearman plots saved in 'spearman's plots/' directory")
 
-def plot_mutation_r_heatmap(csv_path, target_col='Age'):
+def plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=None):
     """
     Plot a heatmap of Spearman r values between each normalized mutation column (per_1k/per1k) and the target column (e.g., Age),
     as well as the total mutation count column if present. Also plot a clustered heatmap of these values for all samples.
@@ -299,7 +307,7 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age'):
     # Plot heatmap of r values
     plt.figure(figsize=(max(8, len(mutation_cols) * 0.4), 2.5))
     sns.heatmap(r_df.T, annot=True, cmap='coolwarm', center=0, cbar_kws={'label': "Spearman's r"})
-    version = get_patterns_version()
+    version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
     plt.title(f"Spearman r values: Normalized Mutations vs {target_col} [{version}]")
     plt.yticks(rotation=0)
     plt.tight_layout()
@@ -325,10 +333,10 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age'):
     #     print(f"Clustered mutation value heatmap saved as {output_path2}")
 
 
-def plot_mutation_r_heatmap_main():
-    plot_mutation_r_heatmap('telomere_analysis.csv', target_col='Age')
+def plot_mutation_r_heatmap_main(patterns_file_path):
+    plot_mutation_r_heatmap('telomere_analysis.csv', target_col='Age', patterns_file_path=patterns_file_path)
 
-def plot_pairwise_r_heatmap(csv_path):
+def plot_pairwise_r_heatmap(csv_path, patterns_file_path=None):
     """
     Plot a heatmap of pairwise Spearman r values between all relevant columns (per_1k/per1k, total mutation count, Age, and telomere columns).
     The diagonal is masked (crossed out).
@@ -407,7 +415,7 @@ def plot_pairwise_r_heatmap(csv_path):
     # Cross out the diagonal
     for i in range(n):
         ax.add_patch(plt.Rectangle((i, i), 1, 1, fill=False, edgecolor='black', lw=2, hatch='xx'))
-    version = get_patterns_version()
+    version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
     plt.title(f"Pairwise Spearman r Heatmap (Normalized Mutations, Age, Telomere) [{version}]", fontsize=14)
     plt.xticks(rotation=45, ha='right', fontsize=9)
     plt.yticks(fontsize=9)
@@ -419,10 +427,10 @@ def plot_pairwise_r_heatmap(csv_path):
     plt.close()
     print(f"Pairwise mutation r heatmap saved as {output_path}")
 
-def plot_pairwise_r_heatmap_main():
-    plot_pairwise_r_heatmap('telomere_analysis.csv')
+def plot_pairwise_r_heatmap_main(patterns_file_path):
+    plot_pairwise_r_heatmap('telomere_analysis.csv', patterns_file_path=patterns_file_path)
 
-def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots"):
+def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_file_path=None):
     """
     Perform curve fitting analysis for telomere length vs age and mutation rate vs age.
     Try multiple curve types (linear, exponential, logarithmic, polynomial, power) and export the best-fit plots.
@@ -581,7 +589,7 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots"):
             
             plt.xlabel('Age (years)', fontsize=12)
             plt.ylabel('Telomere Length (bp)', fontsize=12)
-            version = get_patterns_version()
+            version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
             plt.title(f'Curve Fitting: Telomere Length vs Age [{version}]', fontsize=14, fontweight='bold')
             plt.legend()
             plt.grid(True, alpha=0.3)
@@ -713,7 +721,7 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots"):
                 
                 plt.xlabel('Age (years)', fontsize=12)
                 plt.ylabel(col.replace('_', ' ').title(), fontsize=12)
-                version = get_patterns_version()
+                version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
                 plt.title(f'Curve Fitting: {col.replace("_", " ").title()} vs Age [{version}]', fontsize=14, fontweight='bold')
                 plt.legend()
                 plt.grid(True, alpha=0.3)
@@ -743,16 +751,18 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots"):
             print(f"  Parameters: {best_result['Parameters']}")
             print()
 
-def curve_fitting_analysis_main():
+def curve_fitting_analysis_main(patterns_file_path):
     """Main function to run curve fitting analysis"""
-    curve_fitting_analysis('telomere_analysis.csv')
+    curve_fitting_analysis('telomere_analysis.csv', patterns_file_path=patterns_file_path)
 
 
 if __name__ == "__main__":
-    plot_mutational_signatures_main()
-    plot_spearman_with_age_main()
-    plot_composite_score_main()
-    plot_mutation_r_heatmap_main()
-    plot_pairwise_r_heatmap_main()
-    curve_fitting_analysis_main()
+    _dir = os.path.dirname(__file__)
+    _path = os.path.join(_dir, 'telomere_patterns_2x.json')
+    plot_mutational_signatures_main(_path)
+    plot_spearman_with_age_main(_path)
+    plot_composite_score_main(_path)
+    plot_mutation_r_heatmap_main(_path)
+    plot_pairwise_r_heatmap_main(_path)
+    curve_fitting_analysis_main(_path)
     # plot_frameshift_analysis_main()  # Frameshift analysis disabled

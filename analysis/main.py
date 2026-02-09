@@ -1,35 +1,32 @@
 import os
 import sys
 
-# Patterns file used by generate_csv, plotting, and trendline. Set before other steps.
-from patterns_config import set_patterns_file
+# Patterns file path: pass to generate_csv, plotting, and trendline (single definition here).
 _patterns_path = os.path.join(os.path.dirname(__file__), 'telomere_patterns_2x.json')
-set_patterns_file(_patterns_path)
 
 # Step 1: Generate CSV
 print("[1/4] Generating telomere_analysis.csv ...")
 from generate_csv import generate_csv
 # data_dir = "/Users/akhilpeddikuppa/FieldLab/GreiderCodeSearch/greider_data_download"
-# data_dir = "/Users/akhilpeddikuppa/FieldLab/GreiderCodeSearch/greider_data_download"
-# generate_csv(data_dir)
+# generate_csv(data_dir, patterns_file_path=_patterns_path)
 
 # Step 2: Plot histograms
 # print("[2/4] Plotting histograms ...")
 # from histogram import plot_histograms_main
 # plot_histograms_main()
 
-# Step 3: Plot mutational signatures
+# Step 3: Plot mutational signatures (pass _patterns_path when calling)
 print("[3/4] Plotting mutational signatures ...")
 from plotting import plot_mutational_signatures_main
 from plotting import plot_spearman_with_age_main
 from plotting import plot_composite_score_main
 # from plotting import plot_mutation_r_heatmap_main
 from plotting import plot_pairwise_r_heatmap_main
-# plot_mutational_signatures_main()
-# plot_spearman_with_age_main()
-# plot_composite_score_main()
-# plot_mutation_r_heatmap_main()
-# plot_pairwise_r_heatmap_main()
+# plot_mutational_signatures_main(_patterns_path)
+# plot_spearman_with_age_main(_patterns_path)
+# plot_composite_score_main(_patterns_path)
+# plot_mutation_r_heatmap_main(_patterns_path)
+# plot_pairwise_r_heatmap_main(_patterns_path)
 
 # Step 4: Plot trendlines and correlations (all config defined here)
 print("[4/4] Plotting trendlines and correlations ...")
@@ -56,6 +53,7 @@ plot_trendlines_main(
     spearman_output_path=_SPEARMAN_OUTPUT,
     variables=_TRENDLINE_VARIABLES,
     titles=_TRENDLINE_TITLES,
+    patterns_file_path=_patterns_path,
 )
 
 print("\nAll processing complete.")

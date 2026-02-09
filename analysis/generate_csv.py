@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import gzip
+import json
 from collections import defaultdict
 import csv
 import os
@@ -8,7 +9,13 @@ import numpy as np
 import glob
 import HTSeq
 
-from patterns_config import load_patterns
+
+def load_patterns(patterns_file_path):
+    """Load patterns and general_mutation_map from the given patterns JSON path."""
+    with open(patterns_file_path, 'r') as f:
+        data = json.load(f)
+    version = data.get('version', 'unknown')
+    return data['patterns'], data['general_mutation_map'], version
 
 
 def read_sequence_file(file_path: str):
@@ -125,15 +132,18 @@ def get_sequence_files(directory: str):
     
     return sorted(sequence_files)  # Sort for consistent ordering
 
-def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None):
+def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, patterns_file_path=None):
     """
     Generate CSV file from sequence data.
-    
+
     Args:
         data_dir: Directory containing sequence files
         output_callback: Optional callback function to receive console output
         metadata_file_path: Optional path to metadata file
+        patterns_file_path: Path to patterns JSON (e.g. from main.py)
     """
+    if patterns_file_path is None:
+        raise ValueError("patterns_file_path is required; pass it from main.py.")
     sequence_files = get_sequence_files(data_dir)
     
     if not sequence_files:
@@ -148,7 +158,7 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None):
     length_data = load_length_data(metadata_file_path)
 
     # Load patterns from reference file
-    patterns, general_mutation_map, patterns_version = load_patterns()
+    patterns, general_mutation_map, patterns_version = load_patterns(patterns_file_path)
 
     with open('telomere_analysis.csv', 'w', newline='') as csvfile:
         fieldnames = [
@@ -175,8 +185,7 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None):
         fieldnames.extend([
             'composite_transition_per_1k',
             'composite_transversion_per_1k',
-            # 'mutation_ratio_CtoA_CtoT',
-            # 'mutation_ratio_GtoA_GtoT',
+
             'g_strand_mutations_sum_per_1k',
             'c_strand_mutations_sum_per_1k',
             'log_telomere_length',
@@ -184,7 +193,7 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None):
             'telomere_transition_interaction',
             'mutation_rate_normalized_by_length',
             'log_telomere_tg_composite',
-            # 'ratio_ga_g3_ct_c3',
+
             'composite_score'
         ])
 

@@ -765,4 +765,3 @@ if __name__ == "__main__":
     plot_mutation_r_heatmap_main(_path)
     plot_pairwise_r_heatmap_main(_path)
     curve_fitting_analysis_main(_path)
-    # plot_frameshift_analysis_main()  # Frameshift analysis disabled

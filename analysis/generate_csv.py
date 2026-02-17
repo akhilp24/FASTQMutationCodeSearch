@@ -192,15 +192,12 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
         fieldnames.extend([
             'composite_transition_per_1k',
             'composite_transversion_per_1k',
-
             'g_strand_mutations_sum_per_1k',
             'c_strand_mutations_sum_per_1k',
             'log_telomere_length',
             'telomere_length_bin',
             'telomere_transition_interaction',
             'mutation_rate_normalized_by_length',
-            'log_telomere_tg_composite',
-
             'composite_score'
         ])
 
@@ -220,16 +217,6 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
             'total_mutations_over_total_c_strand_2xrepeats_per_1k'
         ])
         
-        # Add frameshift-specific fields (disabled)
-        # fieldnames.extend([
-        #     'total_g_strand_frameshifts_per_1k',
-        #     'total_c_strand_frameshifts_per_1k',
-        #     'total_all_frameshifts_per_1k',
-        #     'total_g_strand_deletions_per_1k',
-        #     'total_c_strand_deletions_per_1k', 
-        #     'total_g_strand_insertions_per_1k',
-        #     'total_c_strand_insertions_per_1k'
-        # ])
 
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -353,11 +340,9 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
                 'c_strand_mutations_A>C_a1_per_1k', 'c_strand_mutations_A>C_a2_per_1k'
             ]
 
-            row['composite_transition_per_1k'] = sum(row.get(k, 0) for k in transition_keys)
-            row['composite_transversion_per_1k'] = sum(row.get(k, 0) for k in transversion_keys)
 
 
-            # Composite per strand (frameshifts disabled)
+            # Composite per strand 
             row['g_strand_mutations_sum_per_1k'] = sum(row.get(k, 0) for k in row if k.startswith('g_strand_mutations') and k.endswith('_per_1k'))
             row['c_strand_mutations_sum_per_1k'] = sum(row.get(k, 0) for k in row if k.startswith('c_strand_mutations') and k.endswith('_per_1k'))
 
@@ -379,11 +364,7 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
             except Exception:
                 row['telomere_length_bin'] = 'unknown'
 
-            # Interaction term (telomere length × composite_transition_per_1k)
-            try:
-                row['telomere_transition_interaction'] = float(row['Telomere_Length']) * row['composite_transition_per_1k']
-            except Exception:
-                row['telomere_transition_interaction'] = 0
+           
 
             # --- New composite scores for higher correlation ---
             
@@ -397,19 +378,9 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
             except Exception:
                 row['mutation_rate_normalized_by_length'] = 0
 
-            # 2. Log-Transformed Composite: log(Telomere_Length) * (G-strand mutations T>G t1 per 1k)
-            try:
-                telomere_length = float(row['Telomere_Length'])
-                tg_t1_per_1k = row.get('g_strand_mutations_T>G_t1_per_1k', 0)
-                if telomere_length > 0:
-                    row['log_telomere_tg_composite'] = np.log(telomere_length) * tg_t1_per_1k
-                else:
-                    row['log_telomere_tg_composite'] = 0
-            except Exception:
-                row['log_telomere_tg_composite'] = 0
+           
 
 
-            # 4. Linear Combination (Weighted Sum): -0.6 * Telomere_Length + 0.4 * (Total mutations per 1k strand-specific)
             try:
                 telomere_length = float(row['Telomere_Length'])
                 total_mutations_per_1k = row.get('total_mutations_per_1k_strand_specific', 0)
@@ -419,7 +390,7 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
 
             writer.writerow(row)
             
-            # Create output messages
+
             messages = [
                 f"\nProcessing {filename}:",
                 f"Age: {age}",
@@ -432,8 +403,6 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
                 f"G-strand normalizer ({patterns_version} + mutations): {g_strand_normalizer}",
                 f"C-strand normalizer ({patterns_version} + mutations): {c_strand_normalizer}",
                 f"Total mutations found: {total_mutations}",
-                # f"Frameshifts - G-strand: {row.get('total_g_strand_frameshifts_per_1k', 0):.2f} per 1k reads",
-                # f"Frameshifts - C-strand: {row.get('total_c_strand_frameshifts_per_1k', 0):.2f} per 1k reads"
             ]
             
             if counts['g_strand'] == 0 and counts['c_strand'] == 0:

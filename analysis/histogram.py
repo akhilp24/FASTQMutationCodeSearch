@@ -19,10 +19,10 @@ def plot_histograms(data, output_path):
     ]
     
     titles = [
-        'Total Mutations per 1000bp',
-        'G > A Mutation Rate per 1000bp',
-        'T > G Mutation Rate per 1000bp',
-        'T > C Mutation Rate per 1000bp'
+        'Total Mutations Normalized',
+        'G > A Mutation Rate Normalized',
+        'T > G Mutation Rate Normalized',
+        'T > C Mutation Rate Normalized'
     ]
     
     for i, (var, title) in enumerate(zip(variables, titles)):

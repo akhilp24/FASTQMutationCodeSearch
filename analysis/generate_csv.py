@@ -65,22 +65,22 @@ def count_total_reads(file_path: str) -> int:
     return count
 
 def load_age_data(metadata_file_path=None):
-    """Load age data from greider_methods_table_s2.csv."""
+    """Load age data from greider_methods_table_s2_outliers_removed.csv."""
     age_data = {}
     
     # Try to find the metadata file
     if metadata_file_path is None:
         # Look in current directory first
-        if os.path.exists('greider_methods_table_s2.csv'):
-            metadata_file_path = 'greider_methods_table_s2.csv'
+        if os.path.exists('greider_methods_table_s2_outliers_removed.csv'):
+            metadata_file_path = 'greider_methods_table_s2_outliers_removed.csv'
         # Look in analysis directory
-        elif os.path.exists('../analysis/greider_methods_table_s2.csv'):
-            metadata_file_path = '../analysis/greider_methods_table_s2.csv'
+        elif os.path.exists('../analysis/greider_methods_table_s2_outliers_removed.csv'):
+            metadata_file_path = '../analysis/greider_methods_table_s2_outliers_removed.csv'
         # Look in parent directory
-        elif os.path.exists('analysis/greider_methods_table_s2.csv'):
-            metadata_file_path = 'analysis/greider_methods_table_s2.csv'
+        elif os.path.exists('analysis/greider_methods_table_s2_outliers_removed.csv'):
+            metadata_file_path = 'analysis/greider_methods_table_s2_outliers_removed.csv'
         else:
-            raise FileNotFoundError("greider_methods_table_s2.csv not found in current directory, analysis directory, or parent directory")
+            raise FileNotFoundError("greider_methods_table_s2_outliers_removed.csv not found in current directory, analysis directory, or parent directory")
     
     with open(metadata_file_path, 'r') as f:
         reader = csv.DictReader(f)
@@ -90,22 +90,22 @@ def load_age_data(metadata_file_path=None):
     return age_data
 
 def load_length_data(metadata_file_path=None):
-    """Load length data from greider_methods_table_s2.csv."""
+    """Load length data from greider_methods_table_s2_outliers_removed.csv."""
     length_data = {}
     
     # Try to find the metadata file
     if metadata_file_path is None:
         # Look in current directory first
-        if os.path.exists('greider_methods_table_s2.csv'):
-            metadata_file_path = 'greider_methods_table_s2.csv'
+        if os.path.exists('greider_methods_table_s2_outliers_removed.csv'):
+            metadata_file_path = 'greider_methods_table_s2_outliers_removed.csv'
         # Look in analysis directory
-        elif os.path.exists('../analysis/greider_methods_table_s2.csv'):
-            metadata_file_path = '../analysis/greider_methods_table_s2.csv'
+        elif os.path.exists('../analysis/greider_methods_table_s2_outliers_removed.csv'):
+            metadata_file_path = '../analysis/greider_methods_table_s2_outliers_removed.csv'
         # Look in parent directory
-        elif os.path.exists('analysis/greider_methods_table_s2.csv'):
-            metadata_file_path = 'analysis/greider_methods_table_s2.csv'
+        elif os.path.exists('analysis/greider_methods_table_s2_outliers_removed.csv'):
+            metadata_file_path = 'analysis/greider_methods_table_s2_outliers_removed.csv'
         else:
-            raise FileNotFoundError("greider_methods_table_s2.csv not found in current directory, analysis directory, or parent directory")
+            raise FileNotFoundError("greider_methods_table_s2_outliers_removed.csv not found in current directory, analysis directory, or parent directory")
     
     with open(metadata_file_path, 'r') as f:
         reader = csv.DictReader(f)
@@ -132,25 +132,43 @@ def get_sequence_files(directory: str):
     
     return sorted(sequence_files)  # Sort for consistent ordering
 
-def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, patterns_file_path=None, output_csv_path=None):
+def generate_csv(
+    data_dir: str,
+    output_callback=None,
+    metadata_file_path=None,
+    patterns_file_path=None,
+    output_csv_path=None,
+):
     """
-    Generate CSV file from sequence data.
+    Generate a single CSV file from sequence data containing both raw counts and
+    normalized (per-1k) metrics.
 
     Args:
-        data_dir: Directory containing sequence files
-        output_callback: Optional callback function to receive console output
-        metadata_file_path: Optional path to metadata file
-        patterns_file_path: Path to patterns JSON (e.g. from main.py)
-        output_csv_path: Optional path for output CSV; if None, writes to 'telomere_analysis.csv' in cwd.
-                         If provided, parent directory is created if needed.
+        data_dir: Directory containing sequence files.
+        output_callback: Optional callback function to receive console output.
+        metadata_file_path: Optional path to metadata file (age/length table). If not
+            provided or not found, Age and Telomere_Length will be left empty.
+        patterns_file_path: Path to patterns JSON (e.g. from main.py).
+        output_csv_path: Optional path for output CSV. If None, writes to a file whose
+            name encodes the patterns version, e.g. 'telomere_analysis_<version>.csv'.
+            If provided, parent directory is created if needed.
     """
     if patterns_file_path is None:
         raise ValueError("patterns_file_path is required; pass it from main.py.")
-    csv_path = output_csv_path if output_csv_path is not None else 'telomere_analysis.csv'
-    if output_csv_path is not None:
+
+    # Load patterns from reference file (also provides version for filenames).
+    patterns, general_mutation_map, patterns_version = load_patterns(patterns_file_path)
+
+    # Decide output path for the combined CSV (raw + normalized).
+    if output_csv_path is None:
+        safe_version = patterns_version.replace(' ', '_')
+        csv_path = f"telomere_analysis_{safe_version}.csv"
+    else:
+        csv_path = output_csv_path
         parent = os.path.dirname(csv_path)
         if parent:
             os.makedirs(parent, exist_ok=True)
+
     sequence_files = get_sequence_files(data_dir)
     
     if not sequence_files:
@@ -160,64 +178,66 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
             output_callback(message)
         return
     
-    # Load age data
-    age_data = load_age_data(metadata_file_path)
-    length_data = load_length_data(metadata_file_path)
+    # Load age/length metadata if available; otherwise treat as optional.
+    try:
+        age_data = load_age_data(metadata_file_path)
+        length_data = load_length_data(metadata_file_path)
+    except FileNotFoundError:
+        age_data = {}
+        length_data = {}
 
-    # Load patterns from reference file
-    patterns, general_mutation_map, patterns_version = load_patterns(patterns_file_path)
+    # --- Define headers for the combined CSV ---
+    fieldnames = [
+        'FileName', 'Age', 'Telomere_Length', 'Total_Reads',
+        'c_strand', 'g_strand',
+    ]
 
-    with open(csv_path, 'w', newline='') as csvfile:
-        fieldnames = [
-            'FileName', 'Age', 'Telomere_Length', 'Total_Reads',
-            'c_strand', 'g_strand',
-        ]
-        mutation_keys = []
-        for group in ['g_strand_mutations', 'c_strand_mutations']:
-            for subkey in patterns[group].keys():
-                mutation_keys.append(f"{group}_{subkey}")
-        fieldnames.extend(mutation_keys)
+    mutation_keys = []
+    for group in ['g_strand_mutations', 'c_strand_mutations']:
+        for subkey in patterns[group].keys():
+            mutation_keys.append(f"{group}_{subkey}")
+    # Raw mutation counts
+    fieldnames.extend(mutation_keys)
 
-        # Add normalized rate fields for each mutation key
-        fieldnames.extend([f"{k}_per_1k" for k in mutation_keys])
+    # Normalized rate fields for each mutation key
+    fieldnames.extend([f"{k}_per_1k" for k in mutation_keys])
 
-        # --- Add general mutation per_1k columns ---
-        general_mutation_headers = []
-        for strand, mutmap in general_mutation_map.items():
-            for mut in mutmap:
-                general_mutation_headers.append(f"{strand}_{mut}_per_1k")
-        fieldnames.extend(general_mutation_headers)
+    # --- Add general mutation per_1k columns ---
+    general_mutation_headers = []
+    for strand, mutmap in general_mutation_map.items():
+        for mut in mutmap:
+            general_mutation_headers.append(f"{strand}_{mut}_per_1k")
+    fieldnames.extend(general_mutation_headers)
 
-        # Add new engineered features to the CSV header
-        fieldnames.extend([
-            'composite_transition_per_1k',
-            'composite_transversion_per_1k',
-            'g_strand_mutations_sum_per_1k',
-            'c_strand_mutations_sum_per_1k',
-            'log_telomere_length',
-            'telomere_length_bin',
-            'telomere_transition_interaction',
-            'mutation_rate_normalized_by_length',
-            'composite_score'
-        ])
+    # Add engineered features to the CSV header
+    fieldnames.extend([
+        'composite_transition_per_1k',
+        'composite_transversion_per_1k',
+        'g_strand_mutations_sum_per_1k',
+        'c_strand_mutations_sum_per_1k',
+        'log_telomere_length',
+        'telomere_length_bin',
+        'mutation_rate_normalized_by_length',
+    ])
 
-        # Add summed per-1k columns for each mutation type per strand
-        summed_per_1k_headers = []
-        for strand, mutmap in general_mutation_map.items():
-            for mut, subtypes in mutmap.items():
-                summed_per_1k_headers.append(f"{strand}_{mut}_sum_per_1k")
-        fieldnames.extend(summed_per_1k_headers)
+    # Add summed per-1k columns for each mutation type per strand
+    summed_per_1k_headers = []
+    for strand, mutmap in general_mutation_map.items():
+        for mut, subtypes in mutmap.items():
+            summed_per_1k_headers.append(f"{strand}_{mut}_sum_per_1k")
+    fieldnames.extend(summed_per_1k_headers)
 
-        # Add total mutations field at the end (now strand-specific normalized)
-        fieldnames.append('total_mutations_per_1k_strand_specific')
+    # Add total mutations field at the end (now strand-specific normalized)
+    fieldnames.append('total_mutations_per_1k_strand_specific')
 
-        # Add legacy field names for backward compatibility 
-        fieldnames.extend([
-            'total_mutations_over_total_g_strand_2xrepeats_per_1k',
-            'total_mutations_over_total_c_strand_2xrepeats_per_1k'
-        ])
+    # Add legacy-style total mutation rate fields without hard-coding repeat count in the name.
+    # The repeat context (2x vs 3x) is conveyed by the output CSV filename/patterns version instead.
+    fieldnames.extend([
+        'total_mutations_over_total_g_strand_per_1k',
+        'total_mutations_over_total_c_strand_per_1k',
+    ])
         
-
+    with open(csv_path, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         
@@ -273,7 +293,7 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
                 'c_strand': c_strand_total,
                 'g_strand': g_strand_total,
             }
-
+            
             for k in mutation_keys:
                 row[k] = counts.get(k, 0)
                 # Use strand-specific normalization for mutations
@@ -300,10 +320,13 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
             for strand, mutmap in general_mutation_map.items():
                 for mut, subtypes in mutmap.items():
                     # Regular mutations only (frameshifts disabled)
-                    per_1k_sum = sum(row.get(f"{strand}_mutations_{subtype}_per_1k", 0) for subtype in subtypes)
+                    per_1k_sum = sum(
+                        row.get(f"{strand}_mutations_{subtype}_per_1k", 0)
+                        for subtype in subtypes
+                    )
                     row[f"{strand}_{mut}_sum_per_1k"] = per_1k_sum
             
-            # Total mutations (sum all mutation counts) - now normalized by strand-specific normalizers
+            # Total mutations (sum all mutation counts)
             total_mutations = sum(counts[k] for k in mutation_keys)
             # Use weighted average of strand-specific normalizations
             if g_strand_normalizer > 0 or c_strand_normalizer > 0:
@@ -314,9 +337,10 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
             else:
                 row['total_mutations_per_1k_strand_specific'] = 0
             
-            # Legacy fields for backward compatibility - now use strand-specific normalization
-            row['total_mutations_over_total_g_strand_2xrepeats_per_1k'] = per_1k_strand_specific(total_mutations, g_strand_normalizer)
-            row['total_mutations_over_total_c_strand_2xrepeats_per_1k'] = per_1k_strand_specific(total_mutations, c_strand_normalizer)
+            # Legacy-style fields for backward compatibility - now use strand-specific normalization
+            # Names no longer encode repeat count; that is tracked at the file level.
+            row['total_mutations_over_total_g_strand_per_1k'] = per_1k_strand_specific(total_mutations, g_strand_normalizer)
+            row['total_mutations_over_total_c_strand_per_1k'] = per_1k_strand_specific(total_mutations, c_strand_normalizer)
 
             # --- New engineered features ---
 
@@ -381,13 +405,9 @@ def generate_csv(data_dir: str, output_callback=None, metadata_file_path=None, p
            
 
 
-            try:
-                telomere_length = float(row['Telomere_Length'])
-                total_mutations_per_1k = row.get('total_mutations_per_1k_strand_specific', 0)
-                row['composite_score'] = -0.6 * telomere_length + 0.4 * total_mutations_per_1k
-            except Exception:
-                row['composite_score'] = 0
+           
 
+            # Write combined row
             writer.writerow(row)
             
 

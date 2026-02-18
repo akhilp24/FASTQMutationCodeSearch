@@ -42,7 +42,7 @@ analysis/
   scatterplot.py           # (Advanced) Custom scatterplots
   telomere_analysis.csv    # Main output: mutation counts/rates per sample
   telomere_analysis_3x_repeat.csv # (Optional) 3x repeat analysis
-  greider_methods_table_s2.csv    # Sample metadata (age, telomere length)
+  greider_methods_table_s2_outliers_removed.csv    # Sample metadata (age, telomere length)
   plots/                   # Individual signature plots
   output/                  # Summary plots (trendline, histogram, etc.)
   resources/               # Documentation, calculation notes
@@ -61,7 +61,7 @@ modeling/
 ## Data Preparation
 
 1. **Sequencing Data**: Place your `.fastq` or `.fastq.gz` files in `greider_data_download/`.
-2. **Sample Metadata**: Ensure `analysis/greider_methods_table_s2.csv` exists with columns:
+2. **Sample Metadata**: Ensure `analysis/greider_methods_table_s2_outliers_removed.csv` exists with columns:
    - `fastq file name`, `Age (Years)`, `Mean Telomere Length (bps)`
    - Filenames should use dots (e.g., `JH47.F86.NB70`).
 
@@ -78,7 +78,7 @@ cd analysis
 python main.py
 ```
 
-- **Input**: FASTQ files, `greider_methods_table_s2.csv`
+- **Input**: FASTQ files, `greider_methods_table_s2_outliers_removed.csv`
 - **Output**: `telomere_analysis.csv` (mutation counts/rates per sample)
 
 ### 2. Generate Plots
@@ -162,7 +162,7 @@ python predict_age.py
 ## Troubleshooting
 
 - **No FASTQ files found**: Check `greider_data_download/`
-- **Metadata missing**: Ensure `greider_methods_table_s2.csv` is present and formatted correctly
+- **Metadata missing**: Ensure `greider_methods_table_s2_outliers_removed.csv` is present and formatted correctly
 - **Dependencies**: Install with `pip install -r requirements.txt` (if available)
 - **Filename mismatches**: Use dots, not underscores, in sample names
 

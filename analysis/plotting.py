@@ -6,6 +6,7 @@ import os
 import seaborn as sns
 from scipy.optimize import curve_fit
 from scipy import stats
+from scipy.stats import spearmanr, linregress
 
 import numbers
 
@@ -17,6 +18,323 @@ def _get_patterns_version(patterns_file_path):
             return json.load(f).get('version', 'unknown')
     except Exception:
         return 'unknown'
+
+
+def _default_csv_path_from_patterns(patterns_file_path):
+    """
+    Construct the default telomere_analysis CSV path based on the patterns version
+    (e.g., encode whether this run used 2x vs 3x repeats).
+    """
+    version = _get_patterns_version(patterns_file_path)
+    safe_version = str(version).replace(' ', '_')
+    _dir = os.path.dirname(__file__)
+    # Use the single combined CSV (raw + normalized metrics) by default.
+    return os.path.join(_dir, f'telomere_analysis_{safe_version}.csv')
+
+
+# ---------------------------------------------------------------------------
+# Histogram-style visualizations (migrated from histogram.py)
+# ---------------------------------------------------------------------------
+
+def _plot_histograms_by_age_group(data, output_path):
+    """
+    Plot boxplots of several mutation rate variables in 10‑year age bins (2x2 grid).
+    """
+    sns.set_style("whitegrid")
+    sns.set_palette("husl")
+
+    fig, axes = plt.subplots(2, 2, figsize=(20, 12))
+    fig.suptitle('Mutation Rates by Age Groups (10-year bins)', fontsize=16, fontweight='bold')
+
+    variables = [
+        'total_mutations_over_total_g_strand_per_1k',
+        'g_strand_A>G_sum_per_1k',  # pos1 mutation rate
+        'g_strand_T>G_sum_per_1k',  # pos2 mutation rate
+        'g_strand_T>C_sum_per_1k',  # pos3 mutation rate
+    ]
+
+    titles = [
+        'Total Mutations Normalized',
+        'G > A Mutation Rate Normalized',
+        'T > G Mutation Rate Normalized',
+        'T > C Mutation Rate Normalized',
+    ]
+
+    for i, (var, title) in enumerate(zip(variables, titles)):
+        row = i // 2
+        col = i % 2
+        ax = axes[row, col]
+
+        plot_data = data.dropna(subset=['Age', var])
+        if len(plot_data) > 0:
+            # Create age bins of 10 years
+            age_bins = np.arange(0, plot_data['Age'].max() + 10, 10)
+            age_labels = [f'{int(bin_start)}-{int(bin_start + 9)}' for bin_start in age_bins[:-1]]
+
+            # Add age group column
+            plot_data = plot_data.copy()
+            plot_data['Age_Group'] = pd.cut(
+                plot_data['Age'], bins=age_bins, labels=age_labels, include_lowest=True
+            )
+
+            sns.boxplot(data=plot_data, x='Age_Group', y=var, ax=ax)
+
+            ax.set_title(title, fontweight='bold')
+            ax.set_xlabel('Age Group (years)')
+            ax.set_ylabel('Mutations per 1000bp')
+            plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        else:
+            ax.text(
+                0.5,
+                0.5,
+                'No data available',
+                ha='center',
+                va='center',
+                transform=ax.transAxes,
+                fontsize=12,
+            )
+            ax.set_title(title, fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
+
+
+def _plot_mutations_per_file(data, output_path):
+    """
+    Create a bar plot showing the total number of mutations per file, with summary stats.
+    """
+    sns.set_style("whitegrid")
+    plt.figure(figsize=(16, 10))
+
+    # Get all raw mutation columns (contain 'mutations' but not 'per_1k')
+    mutation_columns = [
+        col for col in data.columns if 'mutations' in col and 'per_1k' not in col
+    ]
+
+    data_with_totals = data.copy()
+    data_with_totals['Total_Mutations'] = data[mutation_columns].sum(axis=1)
+
+    plot_data = data_with_totals.dropna(subset=['FileName', 'Total_Mutations'])
+
+    if len(plot_data) > 0:
+        plot_data = plot_data.sort_values('Total_Mutations', ascending=True)
+
+        plt.figure(figsize=(16, 10))
+        bars = plt.bar(
+            range(len(plot_data)),
+            plot_data['Total_Mutations'],
+            color='steelblue',
+            alpha=0.7,
+            edgecolor='black',
+            linewidth=0.5,
+        )
+
+        plt.title('Total Number of Mutations per File', fontsize=16, fontweight='bold', pad=20)
+        plt.xlabel('Files', fontsize=12, fontweight='bold')
+        plt.ylabel('Total Number of Mutations', fontsize=12, fontweight='bold')
+        plt.xticks(range(len(plot_data)), plot_data['FileName'], rotation=45, ha='right')
+
+        # Add value labels on top of bars
+        max_val = plot_data['Total_Mutations'].max()
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(
+                bar.get_x() + bar.get_width() / 2.0,
+                height + max_val * 0.01,
+                f'{int(height)}',
+                ha='center',
+                va='bottom',
+                fontsize=8,
+            )
+
+        plt.grid(axis='y', alpha=0.3)
+
+        # Summary statistics
+        mean_mutations = plot_data['Total_Mutations'].mean()
+        median_mutations = plot_data['Total_Mutations'].median()
+        max_mutations = max_val
+        min_mutations = plot_data['Total_Mutations'].min()
+
+        stats_text = (
+            f'Mean: {mean_mutations:.0f}\n'
+            f'Median: {median_mutations:.0f}\n'
+            f'Min: {min_mutations:.0f}\n'
+            f'Max: {max_mutations:.0f}'
+        )
+        plt.text(
+            0.02,
+            0.98,
+            stats_text,
+            transform=plt.gca().transAxes,
+            fontsize=10,
+            verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
+        )
+    else:
+        plt.text(
+            0.5,
+            0.5,
+            'No data available',
+            ha='center',
+            va='center',
+            transform=plt.gca().transAxes,
+            fontsize=12,
+        )
+        plt.title('Total Number of Mutations per File', fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
+    return len(plot_data)
+
+
+def plot_histograms_from_csv(csv_path, output_dir=None):
+    """
+    Public helper to reproduce the histogram-style plots that were in histogram.py,
+    given a telomere analysis CSV path.
+    """
+    if output_dir is None:
+        output_dir = os.path.dirname(csv_path) or '.'
+    os.makedirs(output_dir, exist_ok=True)
+
+    data = pd.read_csv(csv_path)
+
+    hist_path = os.path.join(output_dir, "histogram.png")
+    per_file_path = os.path.join(output_dir, "mutations_per_file_histogram.png")
+
+    _plot_histograms_by_age_group(data, hist_path)
+    print(f"Histogram plot saved as '{hist_path}'")
+
+    num_files = _plot_mutations_per_file(data, per_file_path)
+    print(f"Mutations per file histogram saved as '{per_file_path}'")
+    print(f"Processed {num_files} files")
+
+
+def plot_trendlines(data, output_path, variables, titles, version):
+    """
+    Plot linear trendlines of selected mutation rate variables vs Age in a 2x2 grid.
+    """
+    sns.set_style("whitegrid")
+    sns.set_palette("husl")
+    
+    fig, axes = plt.subplots(2, 2, figsize=(20, 12))
+    fig.suptitle(f'Mutation Rates vs Age [{version}]', fontsize=16, fontweight='bold')
+    
+    for i, (var, title) in enumerate(zip(variables, titles)):
+        row = i // 2
+        col = i % 2
+        ax = axes[row, col]
+        plot_data = data.dropna(subset=['Age', var])
+        
+        if len(plot_data) > 0:
+            sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.6)
+            if len(plot_data) > 1:
+                sns.regplot(
+                    data=plot_data,
+                    x='Age',
+                    y=var,
+                    ax=ax,
+                    scatter=False,
+                    line_kws={'color': 'blue', 'linestyle': '--'},
+                )
+                slope, intercept, r_value, p_value, std_err = linregress(plot_data['Age'], plot_data[var])
+                r_squared = r_value ** 2
+                ax.set_title(f"{title}\nR² = {r_squared:.3f}", fontweight='bold')
+            else:
+                ax.set_title(title, fontweight='bold')
+            ax.set_xlabel('Age')
+            ax.set_ylabel('Mutations per 1000bp')
+        else:
+            ax.text(
+                0.5,
+                0.5,
+                'No data available',
+                ha='center',
+                va='center',
+                transform=ax.transAxes,
+                fontsize=12,
+            )
+            ax.set_title(title, fontweight='bold')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
+
+
+def plot_spearman_trendlines(data, output_path, variables, titles, version):
+    """
+    Plot Spearman correlation scatterplots of selected mutation rate variables vs Age in a 2x2 grid.
+    """
+    sns.set_style("whitegrid")
+    sns.set_palette("husl")
+    
+    fig, axes = plt.subplots(2, 2, figsize=(20, 12))
+    fig.suptitle(
+        f"Spearman's Rank Correlation: Mutation Rates vs Age [{version}]",
+        fontsize=16,
+        fontweight='bold',
+    )
+    
+    for i, (var, title) in enumerate(zip(variables, titles)):
+        row = i // 2
+        col = i % 2
+        ax = axes[row, col]
+        plot_data = data.dropna(subset=['Age', var])
+        if len(plot_data) > 1:
+            corr, pval = spearmanr(plot_data['Age'], plot_data[var])
+            sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.6)
+            ax.set_title(
+                f"{title}\nSpearman r = {corr:.2f}, p = {pval:.2g}",
+                fontweight='bold',
+            )
+            ax.set_xlabel('Age')
+            ax.set_ylabel('Mutations per 1000bp')
+        else:
+            ax.text(
+                0.5,
+                0.5,
+                'No data available',
+                ha='center',
+                va='center',
+                transform=ax.transAxes,
+                fontsize=12,
+            )
+            ax.set_title(title, fontweight='bold')
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
+
+
+def plot_trendlines_main(
+    csv_path,
+    trendline_output_path,
+    spearman_output_path,
+    variables,
+    titles,
+    patterns_file_path,
+):
+    """
+    Main entry point (formerly in trendline.py) for generating 2x2 trendline and
+    Spearman correlation plots for selected variables vs Age.
+    """
+    version = _get_patterns_version(patterns_file_path)
+    data = pd.read_csv(csv_path)
+    plot_trendlines(data, trendline_output_path, variables, titles, version)
+    plot_spearman_trendlines(data, spearman_output_path, variables, titles, version)
+    print(f"Trendline plot saved as '{trendline_output_path}'")
+    print(f"Spearman correlation plot saved as '{spearman_output_path}'")
+
+
+
+
+
+
+
+
+
+
 
 
 def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path, version):
@@ -101,6 +419,17 @@ def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
+
+
+
+
+
+
+
+
+
+
+
 def plot_mutational_signatures(csv_path, patterns_file_path):
     # Set global seaborn style
     sns.set_theme(style="whitegrid", font_scale=1.1)
@@ -149,6 +478,17 @@ def plot_mutational_signatures(csv_path, patterns_file_path):
         filename_base = os.path.splitext(filename)[0]
         output_path = os.path.join('plots', f'{filename_base}.png')
         plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path, version)
+
+
+
+
+
+
+
+
+
+
+
 
 def plot_spearman_with_age(csv_path, patterns_file_path):
     """
@@ -205,55 +545,17 @@ def plot_spearman_with_age(csv_path, patterns_file_path):
     results_csv_path = os.path.join(output_dir, "spearman_results.csv")
     results_df.to_csv(results_csv_path, index=False)
 
-# --- Composite Score Plotting ---
-def plot_composite_score(csv_path, target_col='Age', patterns_file_path=None):
-    """
-    Calculate a composite score from selected columns, plot it against the target column,
-    and display the Spearman correlation.
-    """
-    import scipy.stats as stats
-    # Columns to combine - updated to use read-based metrics (frameshifts disabled)
-    top_features = [
-        'total_mutations_per_1k_reads',  # Updated to use read-based normalization
-        'g_strand_mutations_A>C_a1_per_1k',
-        'g_strand_mutations_T>G_t2_per_1k',
-        'g_strand_mutations_T>G_t1_per_1k',
-        'g_strand_mutations_G>A_g3_per_1k',
-    ]
-    df = pd.read_csv(csv_path)
-    # Drop rows with missing target
-    df = df.dropna(subset=[target_col])
-    # Calculate composite score
-    df['composite_score'] = df[top_features].mean(axis=1)
-    # Calculate Spearman correlation
-    r, p = stats.spearmanr(df['composite_score'], df[target_col])
-    # Plot
-    plt.figure(figsize=(8, 6))
-    ax = sns.scatterplot(x=df[target_col], y=df['composite_score'])
-    sns.regplot(x=df[target_col], y=df['composite_score'], scatter=False, ci=None, line_kws={'color': 'red', 'linestyle': '--'}, ax=ax)
-    ax.set_xlabel(target_col, fontsize=12)
-    ax.set_ylabel('Composite Score', fontsize=12)
-    version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
-    ax.set_title(f"Composite Score vs {target_col} [{version}]\nSpearman's ρ = {r:.2f} (p={p:.2g})", fontsize=14)
-    plt.tight_layout()
-    # Save plot
-    output_dir = "spearman's plots"
-    os.makedirs(output_dir, exist_ok=True)
-    output_path = os.path.join(output_dir, f"composite_score_vs_{target_col}.png")
-    plt.savefig(output_path, dpi=200)
-    plt.close()
-    print(f"Composite score plot saved as {output_path}")
-
-
-def plot_composite_score_main(patterns_file_path):
-    plot_composite_score('telomere_analysis.csv', target_col='Age', patterns_file_path=patterns_file_path)
+    # (Composite score vs Age plotting has been removed; composite_score may still be
+    # used internally in curve-fitting or downstream analyses.)
 
 def plot_mutational_signatures_main(patterns_file_path):
-    plot_mutational_signatures('telomere_analysis.csv', patterns_file_path)
+    csv_path = _default_csv_path_from_patterns(patterns_file_path)
+    plot_mutational_signatures(csv_path, patterns_file_path)
     print("Mutational signature plots saved in 'plots/' directory")
 
 def plot_spearman_with_age_main(patterns_file_path):
-    plot_spearman_with_age('telomere_analysis.csv', patterns_file_path)
+    csv_path = _default_csv_path_from_patterns(patterns_file_path)
+    plot_spearman_with_age(csv_path, patterns_file_path)
     print("Spearman plots saved in 'spearman's plots/' directory")
 
 def plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=None):
@@ -334,7 +636,8 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=None)
 
 
 def plot_mutation_r_heatmap_main(patterns_file_path):
-    plot_mutation_r_heatmap('telomere_analysis.csv', target_col='Age', patterns_file_path=patterns_file_path)
+    csv_path = _default_csv_path_from_patterns(patterns_file_path)
+    plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=patterns_file_path)
 
 def plot_pairwise_r_heatmap(csv_path, patterns_file_path=None):
     """
@@ -428,7 +731,8 @@ def plot_pairwise_r_heatmap(csv_path, patterns_file_path=None):
     print(f"Pairwise mutation r heatmap saved as {output_path}")
 
 def plot_pairwise_r_heatmap_main(patterns_file_path):
-    plot_pairwise_r_heatmap('telomere_analysis.csv', patterns_file_path=patterns_file_path)
+    csv_path = _default_csv_path_from_patterns(patterns_file_path)
+    plot_pairwise_r_heatmap(csv_path, patterns_file_path=patterns_file_path)
 
 def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_file_path=None):
     """
@@ -752,16 +1056,6 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
             print()
 
 def curve_fitting_analysis_main(patterns_file_path):
-    """Main function to run curve fitting analysis"""
-    curve_fitting_analysis('telomere_analysis.csv', patterns_file_path=patterns_file_path)
-
-
-if __name__ == "__main__":
-    _dir = os.path.dirname(__file__)
-    _path = os.path.join(_dir, 'telomere_patterns_2x.json')
-    plot_mutational_signatures_main(_path)
-    plot_spearman_with_age_main(_path)
-    plot_composite_score_main(_path)
-    plot_mutation_r_heatmap_main(_path)
-    plot_pairwise_r_heatmap_main(_path)
-    curve_fitting_analysis_main(_path)
+    """Main function to run curve fitting analysis (invoked via analysis.main CLI)."""
+    csv_path = _default_csv_path_from_patterns(patterns_file_path)
+    curve_fitting_analysis(csv_path, patterns_file_path=patterns_file_path)

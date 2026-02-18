@@ -70,7 +70,7 @@
   },
   "reference": {
     "2x_repeat": {
-      "description": "Two repeat units per pattern. Used in modeling/features.py.",
+      "description": "Two repeat units per pattern.",
       "patterns": {
         "c_strand": "CCCTAACCCTAA",
         "g_strand": "GGGTTAGGGTTA",

@@ -1,181 +1,119 @@
-# Telomere Mutational Signature Analysis & Age Prediction
+# Telomere Mutational Signature Analysis
 
-This repository provides tools for analyzing mutational signatures in telomeric DNA and predicting sample age from telomeric features. The codebase is organized into two main modules:
+This repository analyzes telomeric mutation signatures from sequencing reads and generates summary CSV outputs plus visualization panels for age- and telomere-associated trends.
 
-- **Analysis** (`/analysis`): Extracts, quantifies, and visualizes telomeric mutations from sequencing data.
-- **Modeling** (`/modeling`): Builds and applies machine learning models to predict age from telomeric mutation features.
+The current workflow is centered on `analysis/main.py`, which provides a command-line interface for:
 
----
-
-## Table of Contents
-
-1. [Requirements](#requirements)
-2. [Directory Structure](#directory-structure)
-3. [Data Preparation](#data-preparation)
-4. [Analysis Workflow](#analysis-workflow)
-5. [Modeling Workflow](#modeling-workflow)
-6. [Outputs](#outputs)
-7. [Troubleshooting](#troubleshooting)
-8. [Next Steps](#next-steps)
-
----
+- generating a versioned telomere analysis CSV from FASTQ/FASTA data,
+- plotting from an existing CSV, or
+- running both steps end-to-end.
 
 ## Requirements
 
-- Python 3.6+
+- Python 3.10+ (the CLI uses modern type syntax)
 - Install dependencies:
-  ```bash
-  pip install matplotlib pandas numpy seaborn scipy scikit-learn joblib
-  ```
 
----
-
-## Directory Structure
-
+```bash
+pip install numpy pandas matplotlib seaborn scipy HTSeq
 ```
+
+## Repository Layout
+
+```text
 analysis/
-  main.py                  # Main pipeline: processes FASTQ, outputs mutation CSV
-  generate_csv.py          # (Advanced) Generate CSV from custom data
-  plotting.py              # Individual mutational signature plots
-  trendline.py             # Age correlation and trendline plots
-  histogram.py             # Age group distribution plots
-  scatterplot.py           # (Advanced) Custom scatterplots
-  telomere_analysis.csv    # Main output: mutation counts/rates per sample
-  telomere_analysis_3x_repeat.csv # (Optional) 3x repeat analysis
-  greider_methods_table_s2_outliers_removed.csv    # Sample metadata (age, telomere length)
-  plots/                   # Individual signature plots
-  output/                  # Summary plots (trendline, histogram, etc.)
-  resources/               # Documentation, calculation notes
+  main.py                                     # CLI entrypoint (generate, plot, run)
+  generate_csv.py                             # Sequence parsing + feature/CSV generation
+  plotting.py                                 # Plotting pipelines (signatures, spearman, trendlines, curve fitting)
+  usage.md                                    # More detailed command reference
+  telomere_patterns_2x.json                   # 2x repeat pattern definitions (versioned)
+  telomere_patterns_3x.json                   # 3x repeat pattern definitions (versioned)
+  greider_methods_table_s2_outliers_removed.csv
+  histograms/                                 # Histogram outputs
+  plots/                                      # Per-sample mutational signature bar plots
+  spearman's plots/                           # Spearman scatterplots + pairwise heatmap
+  spearman_correlations/                      # Timestamped 2x2 Spearman panels
+  trendlines/                                 # Timestamped 2x2 trendline panels
+  curve_fitting_plots/                        # Curve-fitting outputs and summary CSV
 
-modeling/
-  features.py              # Feature engineering from mutation CSV
-  train_model.py           # Train age prediction model
-  predict_age.py           # Predict age for new samples
-  age_predictor.joblib     # Saved model
-  feature_importances.png  # Model feature importance plot
-  predicted_vs_actual.png  # Model performance plot
+greider_data_download/                        # Input FASTQ/FASTA(.gz) files
+data/, old/                                   # Legacy and reference data/materials
 ```
 
----
+## Inputs
 
-## Data Preparation
+1. Put sequence files in `greider_data_download/`.
+   - Supported formats: `.fastq`, `.fastq.gz`, `.fasta`, `.fasta.gz`, `.fa`, `.fa.gz`, `.fas`, `.fas.gz`
+2. Provide a patterns file:
+   - `analysis/telomere_patterns_2x.json` or
+   - `analysis/telomere_patterns_3x.json`
+3. (Optional but recommended) Provide metadata CSV:
+   - `analysis/greider_methods_table_s2_outliers_removed.csv`
+   - Required columns: `fastq file name`, `Age (Years)`, `Mean Telomere Length (bps)`
 
-1. **Sequencing Data**: Place your `.fastq` or `.fastq.gz` files in `greider_data_download/`.
-2. **Sample Metadata**: Ensure `analysis/greider_methods_table_s2_outliers_removed.csv` exists with columns:
-   - `fastq file name`, `Age (Years)`, `Mean Telomere Length (bps)`
-   - Filenames should use dots (e.g., `JH47.F86.NB70`).
+## CLI Usage
 
----
-
-## Analysis Workflow
-
-### 1. Run Main Analysis
-
-Extracts telomeric repeat counts and mutation signatures from all FASTQ files.
+Run commands from the repository root:
 
 ```bash
-cd analysis
-python main.py
+python analysis/main.py <command> [options]
 ```
 
-- **Input**: FASTQ files, `greider_methods_table_s2_outliers_removed.csv`
-- **Output**: `telomere_analysis.csv` (mutation counts/rates per sample)
-
-### 2. Generate Plots
-
-#### a. Individual Mutational Signature Plots
+### 1) Generate CSV only
 
 ```bash
-python plotting.py telomere_analysis.csv
+python analysis/main.py generate \
+  --patterns analysis/telomere_patterns_2x.json \
+  --fastq-dir greider_data_download \
+  --metadata analysis/greider_methods_table_s2_outliers_removed.csv
 ```
 
-- Output: Bar plots per sample in `plots/`
+- Produces a versioned CSV such as `telomere_analysis_2x_repeat.csv` (or a custom file if `--csv-out` is provided).
+- CSV includes raw mutation counts, strand-normalized per-1k rates, grouped mutation features, and engineered fields.
 
-#### b. Age Correlation & Trendline Plots
+### 2) Plot from existing CSV
 
 ```bash
-python trendline.py
+python analysis/main.py plot \
+  --patterns analysis/telomere_patterns_2x.json \
+  --csv analysis/telomere_analysis_2x_repeat.csv
 ```
 
-- Output: `trendline.png`, `spearman_correlation.png` in `output/`
+Skip plot groups as needed:
 
-#### c. Age Group Distribution (Boxplots)
+- `--no-hist`
+- `--no-signatures`
+- `--no-spearman`
+- `--no-pairwise`
+- `--no-trendlines`
+- `--no-curve`
+
+### 3) Full pipeline (generate + plot)
 
 ```bash
-python histogram.py
+python analysis/main.py run \
+  --patterns analysis/telomere_patterns_2x.json \
+  --fastq-dir greider_data_download \
+  --metadata analysis/greider_methods_table_s2_outliers_removed.csv
 ```
-
-- Output: `histogram.png` in `output/`
-
-#### d. (Optional) Custom Scatterplots
-
-```bash
-python scatterplot.py
-```
-
-- Output: Custom scatterplots (see script for details)
-
----
-
-## Modeling Workflow
-
-### 1. Feature Engineering
-
-Extracts features from the mutation CSV for modeling.
-
-```bash
-cd ../modeling
-python features.py
-```
-
-- Output: Feature matrix (see script for details)
-
-### 2. Train Age Prediction Model
-
-```bash
-python train_model.py
-```
-
-- Output: `age_predictor.joblib`, `feature_importances.png`, `predicted_vs_actual.png`
-
-### 3. Predict Age for New Samples
-
-```bash
-python predict_age.py
-```
-
-- Output: Predicted ages for input samples
-
----
 
 ## Outputs
 
-- **CSV**: `telomere_analysis.csv` — mutation counts and normalized rates per sample
-- **Plots**:
-  - Individual signature plots: `analysis/plots/`
-  - Summary plots: `analysis/output/` (`trendline.png`, `spearman_correlation.png`, `histogram.png`)
-  - Model plots: `modeling/feature_importances.png`, `modeling/predicted_vs_actual.png`
-- **Model**: `modeling/age_predictor.joblib`
+- **Main CSV**: `telomere_analysis_<patterns-version>.csv`
+- **Per-sample mutational signature plots**: `analysis/plots/`
+- **Histogram outputs**: `analysis/histograms/`
+- **Spearman outputs**: `analysis/spearman's plots/` and `analysis/spearman_correlations/`
+- **Trendline outputs**: `analysis/trendlines/`
+- **Curve-fitting outputs**: `analysis/curve_fitting_plots/` (including `curve_fitting_results.csv`)
 
----
+## Notes
+
+- Pattern version in JSON (for example, `2x_repeat`, `3x_repeat`) drives default output naming.
+- Metadata is optional in CSV generation; if unavailable, `Age` and `Telomere_Length` fields are left blank.
+- Some output files are timestamped to avoid overwriting previous runs.
 
 ## Troubleshooting
 
-- **No FASTQ files found**: Check `greider_data_download/`
-- **Metadata missing**: Ensure `greider_methods_table_s2_outliers_removed.csv` is present and formatted correctly
-- **Dependencies**: Install with `pip install -r requirements.txt` (if available)
-- **Filename mismatches**: Use dots, not underscores, in sample names
-
----
-
-## Next Steps
-
-- Explore mutation patterns in healthy aging
-- Analyze telomere length vs mutation rates
-- Refine age prediction models with additional features
-
----
-
-## Contact
-
-For questions or contributions, please open an issue or pull request.
+- **No sequence files found**: verify `--fastq-dir` path and file extensions.
+- **Missing metadata values**: check sample-name normalization (metadata uses names mapped from underscores to dots).
+- **Import errors**: reinstall dependencies in the active environment.
+- **Unexpected CSV name resolution**: ensure `--patterns` points to the same JSON used to generate the CSV.

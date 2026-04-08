@@ -381,7 +381,7 @@ def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_
     fig, ax = plt.subplots(figsize=(16, 10))
     
     # Create the bar plot with seaborn styling
-    bars = sns.barplot(x=x, y=bar_heights, palette=bar_colors, ax=ax, edgecolor='black', linewidth=0.5)
+    bars = sns.barplot(x=x, y=bar_heights, hue=x, palette=bar_colors, ax=ax, edgecolor='black', linewidth=0.5, legend=False)
     
     # Customize the plot
     for i, label in enumerate(bar_labels):

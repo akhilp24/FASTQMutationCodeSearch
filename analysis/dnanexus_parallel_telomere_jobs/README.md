@@ -76,5 +76,6 @@ This creates histogram, Spearman, heatmap, and trendline outputs compatible with
 ## Notes
 
 - If a participant ID has no CRAM match in the target folder, the launcher fails fast.
+- By default, IDs with no CRAM match are skipped and reported; use `--strict-missing` to fail fast.
 - You can scale by increasing the number of IDs in the text file.
 - For large runs, tune `--instance-type` for memory/throughput trade-offs.

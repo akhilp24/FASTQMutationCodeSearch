@@ -201,6 +201,11 @@ def main() -> None:
     parser.add_argument("--instance-type", default="mem2_hdd2_x4", help="DNANexus instance type for each participant job")
     parser.add_argument("--k", type=int, default=3, help="k-repeat size (default 3)")
     parser.add_argument("--combined-local-csv", default="combined_telomere_results.csv", help="Local path for final combined CSV")
+    parser.add_argument(
+        "--strict-missing",
+        action="store_true",
+        help="Fail immediately if any participant ID has no CRAM in the target folder",
+    )
     args = parser.parse_args()
 
     participant_ids = read_participant_ids(args.participant_ids)
@@ -220,9 +225,17 @@ def main() -> None:
     worker_file_id = upload_worker_script(args.project, support_folder, worker_script)
 
     job_ids: List[str] = []
+    missing_ids: List[str] = []
     print(f"Submitting {len(participant_ids)} participant jobs in parallel...")
     for pid in participant_ids:
-        cram_id = resolve_cram_file_id(args.project, args.cram_folder, pid)
+        try:
+            cram_id = resolve_cram_file_id(args.project, args.cram_folder, pid)
+        except RuntimeError:
+            if args.strict_missing:
+                raise
+            missing_ids.append(pid)
+            print(f"  [skip] No CRAM found for participant {pid}; skipping.")
+            continue
         job_id = submit_one_job(
             destination=jobs_folder,
             cram_file_id=cram_id,
@@ -236,6 +249,15 @@ def main() -> None:
         )
         job_ids.append(job_id)
         print(f"  {pid}: {job_id}")
+
+    if missing_ids:
+        print(f"Skipped {len(missing_ids)} participant IDs without CRAM files.")
+        print("Missing IDs: " + ", ".join(missing_ids))
+    if not job_ids:
+        raise RuntimeError(
+            "No jobs submitted because none of the participant IDs resolved to CRAM files. "
+            "Check the participant list against the selected CRAM folder."
+        )
 
     print("All jobs submitted. Waiting for completion...")
     wait_for_jobs(job_ids)

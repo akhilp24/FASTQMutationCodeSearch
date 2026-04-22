@@ -19,7 +19,7 @@ import shlex
 import subprocess
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List
 
@@ -27,7 +27,18 @@ import pandas as pd
 
 
 def _run(cmd: List[str], check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, check=check, capture_output=True, text=True)
+    try:
+        return subprocess.run(cmd, check=check, capture_output=True, text=True)
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        stdout = (exc.stdout or "").strip()
+        cmd_text = " ".join(cmd)
+        msg = f"Command failed (exit {exc.returncode}): {cmd_text}"
+        if stdout:
+            msg += f"\nstdout:\n{stdout}"
+        if stderr:
+            msg += f"\nstderr:\n{stderr}"
+        raise RuntimeError(msg) from exc
 
 
 def read_participant_ids(path: str) -> List[str]:
@@ -67,6 +78,11 @@ def upload_worker_script(project: str, folder: str, worker_script: str) -> str:
     if not file_id:
         raise RuntimeError("Failed to upload worker script to DNANexus.")
     return file_id
+
+
+def ensure_remote_folder(project: str, folder: str) -> None:
+    folder = folder if folder.startswith("/") else f"/{folder}"
+    _run(["dx", "mkdir", "-p", f"{project}:{folder}"])
 
 
 def submit_one_job(
@@ -188,12 +204,17 @@ def main() -> None:
     args = parser.parse_args()
 
     participant_ids = read_participant_ids(args.participant_ids)
-    run_tag = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    run_tag = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_folder = f"{args.output_base_folder}/run_{run_tag}"
     jobs_folder = f"{run_folder}/jobs"
     per_sample_folder = f"{run_folder}/per_sample_csv"
     support_folder = f"{run_folder}/support"
     combined_folder = f"{run_folder}/combined"
+
+    ensure_remote_folder(args.project, jobs_folder)
+    ensure_remote_folder(args.project, per_sample_folder)
+    ensure_remote_folder(args.project, support_folder)
+    ensure_remote_folder(args.project, combined_folder)
 
     worker_script = str(Path(__file__).with_name("run_single_cram_analysis.py"))
     worker_file_id = upload_worker_script(args.project, support_folder, worker_script)

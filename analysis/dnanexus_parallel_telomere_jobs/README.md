@@ -52,6 +52,8 @@ What this does:
 4. Downloads per-sample CSVs and writes one local combined CSV
 5. Uploads combined CSV to `.../run_<timestamp>/combined/` on DNANexus
 
+The launcher now creates the DNANexus output folders automatically before uploads/jobs.
+
 ### Why metadata CSV is needed
 
 The CRAM contains sequencing reads, but not the phenotype fields needed for downstream analysis plots (age and related covariates).  

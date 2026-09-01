@@ -10,6 +10,20 @@ from scipy.stats import spearmanr, linregress
 
 import numbers
 
+from pubstyle import (
+    COL1,
+    COL2,
+    WONG,
+    WONG_CYCLE,
+    DIVERGING_CMAP,
+    pubstyle,
+    _despine,
+    suptitle,
+    colorbar_kwargs,
+    style_colorbar,
+    annotation_color,
+)
+
 
 def _get_patterns_version(patterns_file_path):
     """Read version string from patterns JSON (path passed from main.py)."""
@@ -40,11 +54,12 @@ def _plot_histograms_by_age_group(data, output_path):
     """
     Plot boxplots of several mutation rate variables in 10‑year age bins (2x2 grid).
     """
-    sns.set_style("whitegrid")
-    sns.set_palette("husl")
+    pubstyle()
+    sns.set_style("ticks")
+    sns.set_palette(WONG_CYCLE)
 
-    fig, axes = plt.subplots(2, 2, figsize=(20, 12))
-    fig.suptitle('Mutation Rates by Age Groups (10-year bins)', fontsize=16, fontweight='bold')
+    fig, axes = plt.subplots(2, 2, figsize=(COL2, 2.7 * 2), constrained_layout=True)
+    suptitle(fig, 'Mutation Rates by Age Groups (10-year bins)')
 
     variables = [
         'total_mutations_over_total_g_strand_per_1k',
@@ -95,7 +110,6 @@ def _plot_histograms_by_age_group(data, output_path):
             )
             ax.set_title(title, fontweight='bold')
 
-    plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
@@ -104,8 +118,8 @@ def _plot_mutations_per_file(data, output_path):
     """
     Create a bar plot showing the total number of mutations per file, with summary stats.
     """
-    sns.set_style("whitegrid")
-    plt.figure(figsize=(16, 10))
+    pubstyle()
+    sns.set_style("ticks")
 
     # Get all raw mutation columns (contain 'mutations' but not 'per_1k')
     mutation_columns = [
@@ -117,38 +131,42 @@ def _plot_mutations_per_file(data, output_path):
 
     plot_data = data_with_totals.dropna(subset=['FileName', 'Total_Mutations'])
 
+    fig, ax = plt.subplots(figsize=(COL2, 3.2), constrained_layout=True)
+
     if len(plot_data) > 0:
         plot_data = plot_data.sort_values('Total_Mutations', ascending=True)
+        n = len(plot_data)
 
-        plt.figure(figsize=(16, 10))
-        bars = plt.bar(
-            range(len(plot_data)),
+        bars = ax.bar(
+            range(n),
             plot_data['Total_Mutations'],
-            color='steelblue',
-            alpha=0.7,
+            color=WONG['blue'],
+            alpha=0.85,
             edgecolor='black',
-            linewidth=0.5,
+            linewidth=0.4,
         )
 
-        plt.title('Total Number of Mutations per File', fontsize=16, fontweight='bold', pad=20)
-        plt.xlabel('Files', fontsize=12, fontweight='bold')
-        plt.ylabel('Total Number of Mutations', fontsize=12, fontweight='bold')
-        plt.xticks(range(len(plot_data)), plot_data['FileName'], rotation=45, ha='right')
+        suptitle(fig, f'Total Number of Mutations per File (n = {n})')
+        ax.set_xlabel('Files')
+        ax.set_ylabel('Total Number of Mutations')
+        ax.set_xticks(range(n))
+        ax.set_xticklabels(plot_data['FileName'], rotation=45, ha='right')
 
         # Add value labels on top of bars
         max_val = plot_data['Total_Mutations'].max()
         for bar in bars:
             height = bar.get_height()
-            plt.text(
+            ax.text(
                 bar.get_x() + bar.get_width() / 2.0,
                 height + max_val * 0.01,
                 f'{int(height)}',
                 ha='center',
                 va='bottom',
-                fontsize=8,
+                fontsize=5.5,
             )
 
-        plt.grid(axis='y', alpha=0.3)
+        ax.grid(axis='y', alpha=0.3, linewidth=0.4)
+        _despine(ax)
 
         # Summary statistics
         mean_mutations = plot_data['Total_Mutations'].mean()
@@ -162,28 +180,28 @@ def _plot_mutations_per_file(data, output_path):
             f'Min: {min_mutations:.0f}\n'
             f'Max: {max_mutations:.0f}'
         )
-        plt.text(
+        ax.text(
             0.02,
             0.98,
             stats_text,
-            transform=plt.gca().transAxes,
-            fontsize=10,
+            transform=ax.transAxes,
+            fontsize=6,
             verticalalignment='top',
-            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
+            bbox=dict(boxstyle='round', facecolor='white', edgecolor=WONG['grey'], alpha=0.9, linewidth=0.5),
         )
     else:
-        plt.text(
+        ax.text(
             0.5,
             0.5,
             'No data available',
             ha='center',
             va='center',
-            transform=plt.gca().transAxes,
-            fontsize=12,
+            transform=ax.transAxes,
+            fontsize=8,
         )
-        plt.title('Total Number of Mutations per File', fontweight='bold')
+        suptitle(fig, 'Total Number of Mutations per File')
+        _despine(ax)
 
-    plt.tight_layout()
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
     return len(plot_data)
@@ -205,30 +223,35 @@ def plot_histograms_from_csv(csv_path, output_dir=None):
 
     _plot_histograms_by_age_group(data, hist_path)
     print(f"Histogram plot saved as '{hist_path}'")
+    print("Caption: Boxplots of normalized (per-1k) mutation rates grouped into "
+          "10-year Age bins; panels show 'No data available' when Age is missing.")
 
     num_files = _plot_mutations_per_file(data, per_file_path)
     print(f"Mutations per file histogram saved as '{per_file_path}'")
     print(f"Processed {num_files} files")
+    print("Caption: Total raw mutation count (sum of all mutation sub-pattern counts) "
+          "per input file, sorted ascending; bars annotated with exact counts.")
 
 
 def plot_trendlines(data, output_path, variables, titles, version):
     """
     Plot linear trendlines of selected mutation rate variables vs Age in a 2x2 grid.
     """
-    sns.set_style("whitegrid")
-    sns.set_palette("husl")
-    
-    fig, axes = plt.subplots(2, 2, figsize=(20, 12))
-    fig.suptitle(f'Mutation Rates vs Age [{version}]', fontsize=16, fontweight='bold')
-    
+    pubstyle()
+    sns.set_style("ticks")
+    sns.set_palette(WONG_CYCLE)
+
+    fig, axes = plt.subplots(2, 2, figsize=(COL2, 2.7 * 2), constrained_layout=True)
+    suptitle(fig, f'Mutation Rates vs Age [{version}]')
+
     for i, (var, title) in enumerate(zip(variables, titles)):
         row = i // 2
         col = i % 2
         ax = axes[row, col]
         plot_data = data.dropna(subset=['Age', var])
-        
+
         if len(plot_data) > 0:
-            sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.6)
+            sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.7, color=WONG['blue'], s=18)
             if len(plot_data) > 1:
                 sns.regplot(
                     data=plot_data,
@@ -236,15 +259,16 @@ def plot_trendlines(data, output_path, variables, titles, version):
                     y=var,
                     ax=ax,
                     scatter=False,
-                    line_kws={'color': 'blue', 'linestyle': '--'},
+                    line_kws={'color': WONG['vermillion'], 'linestyle': '--', 'linewidth': 1},
                 )
                 slope, intercept, r_value, p_value, std_err = linregress(plot_data['Age'], plot_data[var])
                 r_squared = r_value ** 2
-                ax.set_title(f"{title}\nR² = {r_squared:.3f}", fontweight='bold')
+                ax.set_title(f"{title} (n = {len(plot_data)})\nR² = {r_squared:.3f}")
             else:
-                ax.set_title(title, fontweight='bold')
+                ax.set_title(f"{title} (n = {len(plot_data)})")
             ax.set_xlabel('Age')
             ax.set_ylabel('Mutations per 1000bp')
+            _despine(ax)
         else:
             ax.text(
                 0.5,
@@ -253,11 +277,11 @@ def plot_trendlines(data, output_path, variables, titles, version):
                 ha='center',
                 va='center',
                 transform=ax.transAxes,
-                fontsize=12,
+                fontsize=7,
             )
-            ax.set_title(title, fontweight='bold')
-    
-    plt.tight_layout()
+            ax.set_title(title)
+            _despine(ax)
+
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
@@ -266,16 +290,13 @@ def plot_spearman_trendlines(data, output_path, variables, titles, version):
     """
     Plot Spearman correlation scatterplots of selected mutation rate variables vs Age in a 2x2 grid.
     """
-    sns.set_style("whitegrid")
-    sns.set_palette("husl")
-    
-    fig, axes = plt.subplots(2, 2, figsize=(20, 12))
-    fig.suptitle(
-        f"Spearman's Rank Correlation: Mutation Rates vs Age [{version}]",
-        fontsize=16,
-        fontweight='bold',
-    )
-    
+    pubstyle()
+    sns.set_style("ticks")
+    sns.set_palette(WONG_CYCLE)
+
+    fig, axes = plt.subplots(2, 2, figsize=(COL2, 2.7 * 2), constrained_layout=True)
+    suptitle(fig, f"Spearman's Rank Correlation: Mutation Rates vs Age [{version}]")
+
     for i, (var, title) in enumerate(zip(variables, titles)):
         row = i // 2
         col = i % 2
@@ -283,13 +304,13 @@ def plot_spearman_trendlines(data, output_path, variables, titles, version):
         plot_data = data.dropna(subset=['Age', var])
         if len(plot_data) > 1:
             corr, pval = spearmanr(plot_data['Age'], plot_data[var])
-            sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.6)
+            sns.scatterplot(data=plot_data, x='Age', y=var, ax=ax, alpha=0.7, color=WONG['blue'], s=18)
             ax.set_title(
-                f"{title}\nSpearman r = {corr:.2f}, p = {pval:.2g}",
-                fontweight='bold',
+                f"{title} (n = {len(plot_data)})\nSpearman r = {corr:.2f}, p = {pval:.2g}",
             )
             ax.set_xlabel('Age')
             ax.set_ylabel('Mutations per 1000bp')
+            _despine(ax)
         else:
             ax.text(
                 0.5,
@@ -298,11 +319,11 @@ def plot_spearman_trendlines(data, output_path, variables, titles, version):
                 ha='center',
                 va='center',
                 transform=ax.transAxes,
-                fontsize=12,
+                fontsize=7,
             )
-            ax.set_title(title, fontweight='bold')
-    
-    plt.tight_layout()
+            ax.set_title(title)
+            _despine(ax)
+
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
@@ -324,7 +345,11 @@ def plot_trendlines_main(
     plot_trendlines(data, trendline_output_path, variables, titles, version)
     plot_spearman_trendlines(data, spearman_output_path, variables, titles, version)
     print(f"Trendline plot saved as '{trendline_output_path}'")
+    print("Caption: Selected normalized mutation-rate metrics vs Age, with a linear "
+          f"OLS fit and R² per panel [{version}].")
     print(f"Spearman correlation plot saved as '{spearman_output_path}'")
+    print("Caption: Same metrics vs Age, annotated with Spearman's rank correlation "
+          f"coefficient (rho) and p-value per panel [{version}].")
 
 
 
@@ -338,10 +363,9 @@ def plot_trendlines_main(
 
 
 def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_path, version):
-    # Set seaborn style for better-looking plots
-    sns.set_style("whitegrid")
-    sns.set_palette("husl")
-    
+    pubstyle()
+    sns.set_style("ticks")
+
     # Aggregate counts for each mutation type, position, and strand context for a single row
     bar_heights = []
     bar_colors = []
@@ -376,46 +400,34 @@ def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_
         return
     
     x = np.arange(len(bar_heights))
-    
-    # Create figure with seaborn styling
-    fig, ax = plt.subplots(figsize=(16, 10))
-    
-    # Create the bar plot with seaborn styling
-    bars = sns.barplot(x=x, y=bar_heights, hue=x, palette=bar_colors, ax=ax, edgecolor='black', linewidth=0.5, legend=False)
-    
-    # Customize the plot
+
+    fig, ax = plt.subplots(figsize=(COL2, 3.6), constrained_layout=True)
+
+    bars = sns.barplot(x=x, y=bar_heights, hue=x, palette=bar_colors, ax=ax, edgecolor='black', linewidth=0.4, legend=False)
+
     for i, label in enumerate(bar_labels):
-        ax.text(i, -max(bar_heights)*0.02, label, ha='center', va='center', 
-                color='black', fontsize=9, fontweight='normal', rotation=45)
-    
+        ax.text(i, -max(bar_heights)*0.02, label, ha='center', va='center',
+                color='black', fontsize=5.5, fontweight='normal', rotation=45)
+
     ax.set_xticks([])
     ax.set_yticks(np.linspace(0, max(bar_heights), 6))
     ax.set_xlim(-0.5, len(bar_heights) - 0.5)
     ax.set_ylim(-max(bar_heights)*0.1, max(bar_heights) + max(bar_heights)*0.2)
-    
-    # Remove spines for cleaner look
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    
+
+    _despine(ax, keep=())
+
     # Add grid with seaborn styling
-    ax.yaxis.grid(True, linestyle='--', alpha=0.3)
+    ax.yaxis.grid(True, linestyle='--', alpha=0.3, linewidth=0.4)
     ax.set_axisbelow(True)
-    
-    # Set labels and title with improved styling
-    ax.set_ylabel('Percentage of Single Base Modifications', fontsize=14, fontweight='bold')
-    
+
+    ax.set_ylabel('Percentage of Single Base Modifications (%)')
+
     # Title with age and filename
     age = row['Age'] if 'Age' in row else 'N/A'
     filename = row['FileName'] if 'FileName' in row else 'sample'
-    title = f"Mutational Signatures by Position and Strand Context [{version}]\nFile: {filename} | Age: {age} years"
-    ax.set_title(title, fontsize=18, fontweight='bold', pad=30)
-    
-    # Improve layout
-    plt.tight_layout(rect=[0, 0.15, 1, 0.95])
-    
-    # Save with high quality
+    title = f"Mutational Signatures by Position and Strand Context [{version}]\nFile: {filename} | Age: {age} years | n = {len(bar_heights)} contexts"
+    suptitle(fig, title)
+
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
     plt.close()
 
@@ -437,12 +449,12 @@ def plot_mutational_signatures(csv_path, patterns_file_path):
     
     df = pd.read_csv(csv_path)
     mutation_types = [
-        ('C>A', 'blue'),
-        ('C>G', 'black'),
-        ('C>T', 'red'),
-        ('G>A', 'gray'),
-        ('G>C', 'green'),
-        ('G>T', 'pink'),
+        ('C>A', WONG['blue']),
+        ('C>G', WONG['black']),
+        ('C>T', WONG['vermillion']),
+        ('G>A', WONG['grey']),
+        ('G>C', WONG['green']),
+        ('G>T', WONG['purple']),
     ]
     mutation_columns = {
         'C>A': {
@@ -497,8 +509,8 @@ def plot_spearman_with_age(csv_path, patterns_file_path):
     Also outputs a CSV table with the r and p values for each column.
     """
     import scipy.stats as stats
-    # Set seaborn style for consistency
-    sns.set_theme(style="whitegrid", font_scale=1.1)
+    pubstyle()
+    sns.set_style("ticks")
     # Read data
     df = pd.read_csv(csv_path)
     # Ensure output directory exists
@@ -525,20 +537,20 @@ def plot_spearman_with_age(csv_path, patterns_file_path):
         corr, pval = stats.spearmanr(x, y)
         spearman_results.append({'Column': col, 'Spearman_r': corr, 'p_value': pval})
         # Plot using seaborn
-        plt.figure(figsize=(8, 6))
-        ax = sns.scatterplot(x=x, y=y)
+        fig, ax = plt.subplots(figsize=(COL1, 2.6), constrained_layout=True)
+        sns.scatterplot(x=x, y=y, ax=ax, color=WONG['blue'], s=18, alpha=0.8)
         # Add seaborn regression (trendline) with no confidence interval
         if len(x) > 1:
-            sns.regplot(x=x, y=y, scatter=False, ci=None, line_kws={'color': 'red', 'linestyle': '--'}, ax=ax)
-        ax.set_xlabel('Age (years)', fontsize=12)
-        ax.set_ylabel(col, fontsize=12)
+            sns.regplot(x=x, y=y, scatter=False, ci=None, line_kws={'color': WONG['vermillion'], 'linestyle': '--', 'linewidth': 1}, ax=ax)
+        ax.set_xlabel('Age (years)')
+        ax.set_ylabel(col)
         version = _get_patterns_version(patterns_file_path)
-        ax.set_title(f"Spearman's ρ = {corr:.2f} (p={pval:.2g})\n{col} vs Age [{version}]", fontsize=14)
-        plt.tight_layout()
+        suptitle(fig, f"{col} vs Age [{version}]\nSpearman's ρ = {corr:.2f} (p={pval:.2g}, n = {len(x)})")
+        _despine(ax)
         # Save plot
         safe_col = col.replace('/', '_').replace(' ', '_').replace('>', 'to').replace('<', 'lt').replace(':', '_')
         output_path = os.path.join(output_dir, f"{safe_col}_vs_Age.png")
-        plt.savefig(output_path, dpi=200)
+        plt.savefig(output_path, dpi=300)
         plt.close()
     # Output CSV table of results
     results_df = pd.DataFrame(spearman_results)
@@ -552,11 +564,15 @@ def plot_mutational_signatures_main(patterns_file_path):
     csv_path = _default_csv_path_from_patterns(patterns_file_path)
     plot_mutational_signatures(csv_path, patterns_file_path)
     print("Mutational signature plots saved in 'plots/' directory")
+    print("Caption: Per-sample percentage breakdown of single-base substitution "
+          "context at each repeat position, on both G- and C-strand telomere repeats.")
 
 def plot_spearman_with_age_main(patterns_file_path):
     csv_path = _default_csv_path_from_patterns(patterns_file_path)
     plot_spearman_with_age(csv_path, patterns_file_path)
     print("Spearman plots saved in 'spearman's plots/' directory")
+    print("Caption: Each numeric CSV column vs Age, annotated with Spearman's rho "
+          "and p-value; a results table is written to spearman_results.csv.")
 
 def plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=None):
     """
@@ -564,6 +580,7 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=None)
     as well as the total mutation count column if present. Also plot a clustered heatmap of these values for all samples.
     """
     import scipy.stats as stats
+    pubstyle()
     # Read data
     df = pd.read_csv(csv_path)
     # Only keep columns with numeric data and drop rows with missing target
@@ -607,16 +624,20 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=None)
     r_df = pd.DataFrame({'Mutation': mutation_cols, 'Spearman_r': r_values})
     r_df = r_df.set_index('Mutation')
     # Plot heatmap of r values
-    plt.figure(figsize=(max(8, len(mutation_cols) * 0.4), 2.5))
-    sns.heatmap(r_df.T, annot=True, cmap='coolwarm', center=0, cbar_kws={'label': "Spearman's r"})
+    fig, ax = plt.subplots(figsize=(max(COL2, len(mutation_cols) * 0.35), 2.2), constrained_layout=True)
+    cbar_kws = colorbar_kwargs()
+    cbar_kws['label'] = "Spearman's r"
+    hm = sns.heatmap(r_df.T, annot=True, annot_kws={"size": 5.5}, cmap=DIVERGING_CMAP, center=0,
+                      cbar_kws=cbar_kws, ax=ax)
+    style_colorbar(hm.collections[0].colorbar)
     version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
-    plt.title(f"Spearman r values: Normalized Mutations vs {target_col} [{version}]")
-    plt.yticks(rotation=0)
-    plt.tight_layout()
+    n_samples = df.shape[0]
+    suptitle(fig, f"Spearman r: Normalized Mutations vs {target_col} [{version}] (n = {n_samples})")
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
     output_dir = "spearman's plots"
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, f"mutation_r_heatmap_vs_{target_col}.png")
-    plt.savefig(output_path, dpi=200)
+    plt.savefig(output_path, dpi=300)
     plt.close()
     print(f"Mutation r heatmap saved as {output_path}")
 
@@ -645,8 +666,10 @@ def plot_pairwise_r_heatmap(csv_path, patterns_file_path=None):
     The diagonal is masked (crossed out).
     """
     import scipy.stats as stats
+    pubstyle()
     # Read data
     df = pd.read_csv(csv_path)
+    n_samples = df.shape[0]
     # Only use columns with 'per_1k' or 'per1k' in the name, plus total mutation count if present
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     mutation_cols = [col for col in numeric_cols if ('per_1k' in col or 'per1k' in col)]
@@ -699,36 +722,49 @@ def plot_pairwise_r_heatmap(csv_path, patterns_file_path=None):
             r_matrix[i, j] = r
     # Mask the diagonal
     mask = np.eye(n, dtype=bool)
-    # Plot heatmap with improved readability
-    fig_width = max(10, n * 0.7)
-    fig_height = max(8, n * 0.7)
-    plt.figure(figsize=(fig_width, fig_height))
-    ax = sns.heatmap(
+    # Plot heatmap with improved readability, capped to a sane print size.
+    # Above ~25 variables, per-cell numeric annotations become unreadable anyway,
+    # so drop them and let the colorbar carry the magnitude.
+    max_dim = COL2 * 2.2
+    fig_width = min(max_dim, max(COL2, n * 0.55))
+    fig_height = min(max_dim, max(COL2 * 0.8, n * 0.55))
+    show_annot = n <= 25
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), constrained_layout=True)
+    cbar_kws = colorbar_kwargs()
+    cbar_kws['label'] = "Spearman's r"
+    hm = sns.heatmap(
         r_matrix,
-        annot=True,
+        annot=show_annot,
         fmt=".2f",
-        cmap="coolwarm",
+        cmap=DIVERGING_CMAP,
         center=0,
         mask=mask,
         xticklabels=mutation_cols,
         yticklabels=mutation_cols,
-        cbar_kws={'label': "Spearman's r"},
-        annot_kws={"size": 8}
+        cbar_kws=cbar_kws,
+        annot_kws={"size": 5},
+        ax=ax,
     )
+    style_colorbar(hm.collections[0].colorbar)
     # Cross out the diagonal
+    diag_lw = 1 if show_annot else 0.3
     for i in range(n):
-        ax.add_patch(plt.Rectangle((i, i), 1, 1, fill=False, edgecolor='black', lw=2, hatch='xx'))
+        ax.add_patch(plt.Rectangle((i, i), 1, 1, fill=False, edgecolor='black', lw=diag_lw, hatch='xx' if show_annot else None))
+    if not show_annot:
+        ax.tick_params(axis='both', labelsize=4)
     version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
-    plt.title(f"Pairwise Spearman r Heatmap (Normalized Mutations, Age, Telomere) [{version}]", fontsize=14)
-    plt.xticks(rotation=45, ha='right', fontsize=9)
-    plt.yticks(fontsize=9)
-    plt.tight_layout()
+    suptitle(fig, f"Pairwise Spearman r (Normalized Mutations, Age, Telomere) [{version}] (n = {n_samples})")
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+    ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
     output_dir = "spearman's plots"
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "pairwise_mutation_r_heatmap.png")
-    plt.savefig(output_path, dpi=200)
+    plt.savefig(output_path, dpi=300)
     plt.close()
     print(f"Pairwise mutation r heatmap saved as {output_path}")
+    print("Caption: Pairwise Spearman correlation between all normalized (per-1k) "
+          "mutation metrics plus Age/Telomere_Length where available; diagonal is "
+          f"masked. n = {n_samples} samples.")
 
 def plot_pairwise_r_heatmap_main(patterns_file_path):
     csv_path = _default_csv_path_from_patterns(patterns_file_path)
@@ -783,10 +819,10 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
     
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
-    
-    # Set seaborn style
-    sns.set_theme(style="whitegrid", font_scale=1.1)
-    
+
+    pubstyle()
+    sns.set_style("ticks")
+
     results = []
     
     # 1. Telomere Length vs Age Analysis
@@ -807,10 +843,10 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
             
             best_fit = None
             best_r_squared = -np.inf
-            
-            plt.figure(figsize=(14, 10))  # Larger figure to accommodate annotations
-            colors = ['red', 'green', 'blue', 'orange', 'purple']
-            
+
+            fig, ax = plt.subplots(figsize=(COL2, COL2 * 0.7), constrained_layout=True)
+            colors = WONG_CYCLE
+
             for i, (name, func, initial_guess) in enumerate(curve_types):
                 try:
                     # Perform curve fitting
@@ -846,32 +882,32 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
                     print(f"Could not fit {name} curve to Telomere_Length vs Age: {e}")
             
             # Plot original data
-            plt.scatter(x_data, y_data, alpha=0.7, s=50, color='black', label='Data points')
-            
+            ax.scatter(x_data, y_data, alpha=0.7, s=25, color=WONG['black'], label=f'Data points (n = {len(x_data)})')
+
             # Highlight best fit and identify outliers
             if best_fit:
                 name, func, popt = best_fit
                 x_smooth = np.linspace(x_data.min(), x_data.max(), 100)
                 y_smooth = func(x_smooth, *popt)
-                plt.plot(x_smooth, y_smooth, color='red', linewidth=3, 
+                ax.plot(x_smooth, y_smooth, color=WONG['vermillion'], linewidth=1.5,
                         label=f'Best fit: {name} (R² = {best_r_squared:.3f})')
-                
+
                 # Identify and annotate outliers
                 y_pred = func(x_data, *popt)
                 residuals = y_data - y_pred
                 residual_std = np.std(residuals)
                 outlier_threshold = 2 * residual_std  # Points > 2 std deviations
-                
+
                 outlier_indices = np.where(np.abs(residuals) > outlier_threshold)[0]
                 if len(outlier_indices) > 0:
                     # Plot outliers with different color
-                    plt.scatter(x_data[outlier_indices], y_data[outlier_indices], 
-                              alpha=0.9, s=80, color='orange', edgecolor='red', linewidth=2,
+                    ax.scatter(x_data[outlier_indices], y_data[outlier_indices],
+                              alpha=0.9, s=40, color=WONG['orange'], edgecolor=WONG['vermillion'], linewidth=1,
                               label=f'Outliers (>{outlier_threshold:.1f} from curve)', zorder=5)
-                    
+
                     print(f"\n--- Telomere Length Outliers ---")
                     print(f"Outlier threshold: ±{outlier_threshold:.1f} bp")
-                    
+
                     # Annotate outliers with sample names
                     for idx in outlier_indices:
                         sample_name = telomere_df.iloc[idx]['FileName'] if 'FileName' in telomere_df.columns else f'Sample_{idx}'
@@ -879,31 +915,34 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
                         telomere_length = y_data[idx]
                         residual = residuals[idx]
                         print(f"  {sample_name}: Age={age:.1f}, TL={telomere_length:.1f}bp, Residual={residual:+.1f}bp")
-                        
+
                         # Shorten sample name for plot if too long
                         display_name = sample_name
                         if len(str(sample_name)) > 15:
                             display_name = str(sample_name)[:12] + '...'
-                        plt.annotate(display_name, 
+                        ax.annotate(display_name,
                                    (x_data[idx], y_data[idx]),
                                    xytext=(10, 10), textcoords='offset points',
-                                   fontsize=8, ha='left', va='bottom',
-                                   bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
-                                   arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.1'))
-            
-            plt.xlabel('Age (years)', fontsize=12)
-            plt.ylabel('Telomere Length (bp)', fontsize=12)
+                                   fontsize=5.5, ha='left', va='bottom',
+                                   bbox=dict(boxstyle='round,pad=0.3', facecolor=WONG['yellow'], alpha=0.7, linewidth=0.4),
+                                   arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.1', linewidth=0.6))
+
+            ax.set_xlabel('Age (years)')
+            ax.set_ylabel('Telomere Length (bp)')
             version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
-            plt.title(f'Curve Fitting: Telomere Length vs Age [{version}]', fontsize=14, fontweight='bold')
-            plt.legend()
-            plt.grid(True, alpha=0.3)
-            plt.tight_layout()
-            
+            suptitle(fig, f'Curve Fitting: Telomere Length vs Age [{version}]')
+            ax.legend()
+            ax.grid(True, alpha=0.3, linewidth=0.4)
+            _despine(ax)
+
             # Save plot
             output_path = os.path.join(output_dir, 'telomere_length_vs_age_curve_fitting.png')
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             plt.close()
             print(f"Telomere length curve fitting plot saved: {output_path}")
+            print("Caption: Telomere length vs Age with best-fit curve (of 5 candidate "
+                  "functional forms) highlighted; points beyond 2 SD of the fit are "
+                  "flagged as outliers and labeled by sample.")
     
     # 2. Mutation Rate vs Age Analysis
     # Find mutation rate columns (normalized per 1k)
@@ -939,10 +978,10 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
                 
                 best_fit = None
                 best_r_squared = -np.inf
-                
-                plt.figure(figsize=(14, 10))  # Larger figure to accommodate annotations
-                colors = ['red', 'green', 'blue', 'orange', 'purple']
-                
+
+                fig, ax = plt.subplots(figsize=(COL2, COL2 * 0.7), constrained_layout=True)
+                colors = WONG_CYCLE
+
                 for i, (name, func, initial_guess) in enumerate(curve_types):
                     try:
                         # Perform curve fitting
@@ -978,32 +1017,32 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
                         print(f"Could not fit {name} curve to {col} vs Age: {e}")
                 
                 # Plot original data
-                plt.scatter(x_data, y_data, alpha=0.7, s=50, color='black', label='Data points')
-                
+                ax.scatter(x_data, y_data, alpha=0.7, s=25, color=WONG['black'], label=f'Data points (n = {len(x_data)})')
+
                 # Highlight best fit and identify outliers
                 if best_fit:
                     name, func, popt = best_fit
                     x_smooth = np.linspace(x_data.min(), x_data.max(), 100)
                     y_smooth = func(x_smooth, *popt)
-                    plt.plot(x_smooth, y_smooth, color='red', linewidth=3, 
+                    ax.plot(x_smooth, y_smooth, color=WONG['vermillion'], linewidth=1.5,
                             label=f'Best fit: {name} (R² = {best_r_squared:.3f})')
-                    
+
                     # Identify and annotate outliers
                     y_pred = func(x_data, *popt)
                     residuals = y_data - y_pred
                     residual_std = np.std(residuals)
                     outlier_threshold = 2 * residual_std  # Points > 2 std deviations
-                    
+
                     outlier_indices = np.where(np.abs(residuals) > outlier_threshold)[0]
                     if len(outlier_indices) > 0:
                         # Plot outliers with different color
-                        plt.scatter(x_data[outlier_indices], y_data[outlier_indices], 
-                                  alpha=0.9, s=80, color='orange', edgecolor='red', linewidth=2,
+                        ax.scatter(x_data[outlier_indices], y_data[outlier_indices],
+                                  alpha=0.9, s=40, color=WONG['orange'], edgecolor=WONG['vermillion'], linewidth=1,
                                   label=f'Outliers (>{outlier_threshold:.3f} from curve)', zorder=5)
-                        
+
                         print(f"\n--- {col.replace('_', ' ').title()} Outliers ---")
                         print(f"Outlier threshold: ±{outlier_threshold:.3f}")
-                        
+
                         # Annotate outliers with sample names
                         for idx in outlier_indices:
                             sample_name = mutation_df.iloc[idx]['FileName'] if 'FileName' in mutation_df.columns else f'Sample_{idx}'
@@ -1011,32 +1050,35 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
                             value = y_data[idx]
                             residual = residuals[idx]
                             print(f"  {sample_name}: Age={age:.1f}, Value={value:.3f}, Residual={residual:+.3f}")
-                            
+
                             # Shorten sample name for plot if too long
                             display_name = sample_name
                             if len(str(sample_name)) > 15:
                                 display_name = str(sample_name)[:12] + '...'
-                            plt.annotate(display_name, 
+                            ax.annotate(display_name,
                                        (x_data[idx], y_data[idx]),
                                        xytext=(10, 10), textcoords='offset points',
-                                       fontsize=8, ha='left', va='bottom',
-                                       bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7),
-                                       arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.1'))
-                
-                plt.xlabel('Age (years)', fontsize=12)
-                plt.ylabel(col.replace('_', ' ').title(), fontsize=12)
+                                       fontsize=5.5, ha='left', va='bottom',
+                                       bbox=dict(boxstyle='round,pad=0.3', facecolor=WONG['yellow'], alpha=0.7, linewidth=0.4),
+                                       arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=0.1', linewidth=0.6))
+
+                ax.set_xlabel('Age (years)')
+                ax.set_ylabel(col.replace('_', ' ').title())
                 version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
-                plt.title(f'Curve Fitting: {col.replace("_", " ").title()} vs Age [{version}]', fontsize=14, fontweight='bold')
-                plt.legend()
-                plt.grid(True, alpha=0.3)
-                plt.tight_layout()
-                
+                suptitle(fig, f'Curve Fitting: {col.replace("_", " ").title()} vs Age [{version}]')
+                ax.legend()
+                ax.grid(True, alpha=0.3, linewidth=0.4)
+                _despine(ax)
+
                 # Save plot
                 safe_col = col.replace('/', '_').replace(' ', '_').replace('>', 'to').replace('<', 'lt').replace(':', '_')
                 output_path = os.path.join(output_dir, f'{safe_col}_vs_age_curve_fitting.png')
                 plt.savefig(output_path, dpi=300, bbox_inches='tight')
                 plt.close()
                 print(f"Mutation rate curve fitting plot saved: {output_path}")
+                print(f"Caption: {col.replace('_', ' ')} vs Age with best-fit curve "
+                      "(of 5 candidate functional forms) highlighted; points beyond "
+                      "2 SD of the fit are flagged as outliers and labeled by sample.")
     
     # Save results to CSV
     if results:

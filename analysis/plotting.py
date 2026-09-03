@@ -1,4 +1,3 @@
-import json
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -25,25 +24,20 @@ from pubstyle import (
 )
 
 
-def _get_patterns_version(patterns_file_path):
-    """Read version string from patterns JSON (path passed from main.py)."""
-    try:
-        with open(patterns_file_path) as f:
-            return json.load(f).get('version', 'unknown')
-    except Exception:
-        return 'unknown'
+def _get_patterns_version(k):
+    """Return the pattern version label for a given repeat count k, e.g. '3x_repeat'."""
+    return f"{k}x_repeat"
 
 
-def _default_csv_path_from_patterns(patterns_file_path):
+def _default_csv_path_from_patterns(k):
     """
-    Construct the default telomere_analysis CSV path based on the patterns version
+    Construct the default telomere_analysis CSV path based on the repeat count k
     (e.g., encode whether this run used 2x vs 3x repeats).
     """
-    version = _get_patterns_version(patterns_file_path)
-    safe_version = str(version).replace(' ', '_')
+    version = _get_patterns_version(k)
     _dir = os.path.dirname(__file__)
     # Use the single combined CSV (raw + normalized metrics) by default.
-    return os.path.join(_dir, f'telomere_analysis_{safe_version}.csv')
+    return os.path.join(_dir, f'telomere_analysis_{version}.csv')
 
 
 # ---------------------------------------------------------------------------
@@ -334,13 +328,13 @@ def plot_trendlines_main(
     spearman_output_path,
     variables,
     titles,
-    patterns_file_path,
+    k,
 ):
     """
     Main entry point (formerly in trendline.py) for generating 2x2 trendline and
     Spearman correlation plots for selected variables vs Age.
     """
-    version = _get_patterns_version(patterns_file_path)
+    version = _get_patterns_version(k)
     data = pd.read_csv(csv_path)
     plot_trendlines(data, trendline_output_path, variables, titles, version)
     plot_spearman_trendlines(data, spearman_output_path, variables, titles, version)
@@ -442,10 +436,10 @@ def plot_mutational_signature_row(row, mutation_types, mutation_columns, output_
 
 
 
-def plot_mutational_signatures(csv_path, patterns_file_path):
+def plot_mutational_signatures(csv_path, k):
     # Set global seaborn style
     sns.set_theme(style="whitegrid", font_scale=1.1)
-    version = _get_patterns_version(patterns_file_path)
+    version = _get_patterns_version(k)
     
     df = pd.read_csv(csv_path)
     mutation_types = [
@@ -502,7 +496,7 @@ def plot_mutational_signatures(csv_path, patterns_file_path):
 
 
 
-def plot_spearman_with_age(csv_path, patterns_file_path):
+def plot_spearman_with_age(csv_path, k):
     """
     For each numeric column in the CSV (except 'Age'), plot a scatter plot with Age on the x-axis and the column on the y-axis,
     calculate and display the Spearman correlation, and save each plot in 'spearman's plots' directory.
@@ -544,7 +538,7 @@ def plot_spearman_with_age(csv_path, patterns_file_path):
             sns.regplot(x=x, y=y, scatter=False, ci=None, line_kws={'color': WONG['vermillion'], 'linestyle': '--', 'linewidth': 1}, ax=ax)
         ax.set_xlabel('Age (years)')
         ax.set_ylabel(col)
-        version = _get_patterns_version(patterns_file_path)
+        version = _get_patterns_version(k)
         suptitle(fig, f"{col} vs Age [{version}]\nSpearman's ρ = {corr:.2f} (p={pval:.2g}, n = {len(x)})")
         _despine(ax)
         # Save plot
@@ -560,21 +554,21 @@ def plot_spearman_with_age(csv_path, patterns_file_path):
     # (Composite score vs Age plotting has been removed; composite_score may still be
     # used internally in curve-fitting or downstream analyses.)
 
-def plot_mutational_signatures_main(patterns_file_path):
-    csv_path = _default_csv_path_from_patterns(patterns_file_path)
-    plot_mutational_signatures(csv_path, patterns_file_path)
+def plot_mutational_signatures_main(k):
+    csv_path = _default_csv_path_from_patterns(k)
+    plot_mutational_signatures(csv_path, k)
     print("Mutational signature plots saved in 'plots/' directory")
     print("Caption: Per-sample percentage breakdown of single-base substitution "
           "context at each repeat position, on both G- and C-strand telomere repeats.")
 
-def plot_spearman_with_age_main(patterns_file_path):
-    csv_path = _default_csv_path_from_patterns(patterns_file_path)
-    plot_spearman_with_age(csv_path, patterns_file_path)
+def plot_spearman_with_age_main(k):
+    csv_path = _default_csv_path_from_patterns(k)
+    plot_spearman_with_age(csv_path, k)
     print("Spearman plots saved in 'spearman's plots/' directory")
     print("Caption: Each numeric CSV column vs Age, annotated with Spearman's rho "
           "and p-value; a results table is written to spearman_results.csv.")
 
-def plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=None):
+def plot_mutation_r_heatmap(csv_path, target_col='Age', k=None):
     """
     Plot a heatmap of Spearman r values between each normalized mutation column (per_1k/per1k) and the target column (e.g., Age),
     as well as the total mutation count column if present. Also plot a clustered heatmap of these values for all samples.
@@ -630,7 +624,7 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=None)
     hm = sns.heatmap(r_df.T, annot=True, annot_kws={"size": 5.5}, cmap=DIVERGING_CMAP, center=0,
                       cbar_kws=cbar_kws, ax=ax)
     style_colorbar(hm.collections[0].colorbar)
-    version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
+    version = _get_patterns_version(k) if k else 'unknown'
     n_samples = df.shape[0]
     suptitle(fig, f"Spearman r: Normalized Mutations vs {target_col} [{version}] (n = {n_samples})")
     ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
@@ -656,11 +650,11 @@ def plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=None)
     #     print(f"Clustered mutation value heatmap saved as {output_path2}")
 
 
-def plot_mutation_r_heatmap_main(patterns_file_path):
-    csv_path = _default_csv_path_from_patterns(patterns_file_path)
-    plot_mutation_r_heatmap(csv_path, target_col='Age', patterns_file_path=patterns_file_path)
+def plot_mutation_r_heatmap_main(k):
+    csv_path = _default_csv_path_from_patterns(k)
+    plot_mutation_r_heatmap(csv_path, target_col='Age', k=k)
 
-def plot_pairwise_r_heatmap(csv_path, patterns_file_path=None):
+def plot_pairwise_r_heatmap(csv_path, k=None):
     """
     Plot a heatmap of pairwise Spearman r values between all relevant columns (per_1k/per1k, total mutation count, Age, and telomere columns).
     The diagonal is masked (crossed out).
@@ -752,7 +746,7 @@ def plot_pairwise_r_heatmap(csv_path, patterns_file_path=None):
         ax.add_patch(plt.Rectangle((i, i), 1, 1, fill=False, edgecolor='black', lw=diag_lw, hatch='xx' if show_annot else None))
     if not show_annot:
         ax.tick_params(axis='both', labelsize=4)
-    version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
+    version = _get_patterns_version(k) if k else 'unknown'
     suptitle(fig, f"Pairwise Spearman r (Normalized Mutations, Age, Telomere) [{version}] (n = {n_samples})")
     ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
     ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
@@ -766,11 +760,11 @@ def plot_pairwise_r_heatmap(csv_path, patterns_file_path=None):
           "mutation metrics plus Age/Telomere_Length where available; diagonal is "
           f"masked. n = {n_samples} samples.")
 
-def plot_pairwise_r_heatmap_main(patterns_file_path):
-    csv_path = _default_csv_path_from_patterns(patterns_file_path)
-    plot_pairwise_r_heatmap(csv_path, patterns_file_path=patterns_file_path)
+def plot_pairwise_r_heatmap_main(k):
+    csv_path = _default_csv_path_from_patterns(k)
+    plot_pairwise_r_heatmap(csv_path, k=k)
 
-def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_file_path=None):
+def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", k=None):
     """
     Perform curve fitting analysis for telomere length vs age and mutation rate vs age.
     Try multiple curve types (linear, exponential, logarithmic, polynomial, power) and export the best-fit plots.
@@ -929,7 +923,7 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
 
             ax.set_xlabel('Age (years)')
             ax.set_ylabel('Telomere Length (bp)')
-            version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
+            version = _get_patterns_version(k) if k else 'unknown'
             suptitle(fig, f'Curve Fitting: Telomere Length vs Age [{version}]')
             ax.legend()
             ax.grid(True, alpha=0.3, linewidth=0.4)
@@ -1064,7 +1058,7 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
 
                 ax.set_xlabel('Age (years)')
                 ax.set_ylabel(col.replace('_', ' ').title())
-                version = _get_patterns_version(patterns_file_path) if patterns_file_path else 'unknown'
+                version = _get_patterns_version(k) if k else 'unknown'
                 suptitle(fig, f'Curve Fitting: {col.replace("_", " ").title()} vs Age [{version}]')
                 ax.legend()
                 ax.grid(True, alpha=0.3, linewidth=0.4)
@@ -1097,7 +1091,7 @@ def curve_fitting_analysis(csv_path, output_dir="curve_fitting_plots", patterns_
             print(f"  Parameters: {best_result['Parameters']}")
             print()
 
-def curve_fitting_analysis_main(patterns_file_path):
+def curve_fitting_analysis_main(k):
     """Main function to run curve fitting analysis (invoked via analysis.main CLI)."""
-    csv_path = _default_csv_path_from_patterns(patterns_file_path)
-    curve_fitting_analysis(csv_path, patterns_file_path=patterns_file_path)
+    csv_path = _default_csv_path_from_patterns(k)
+    curve_fitting_analysis(csv_path, k=k)

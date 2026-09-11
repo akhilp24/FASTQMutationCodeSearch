@@ -10,7 +10,7 @@ python analysis/main.py <command> [options...]
 
 Commands share these key concepts:
 
-*   **Patterns JSON**: telomere pattern definitions (e.g. `analysis/telomere_patterns_2x.json`).
+*   **Repeat count (`k`)**: number of GGGTTA/CCCTAA repeats (e.g. `3`). Patterns are generated programmatically by `pattern_generator.py` — no patterns file needed.
 *   **Metadata CSV**: age and telomere length table (e.g. `analysis/greider_methods_table_s2_outliers_removed.csv`).
 *   **FASTQ directory**: folder containing `.fastq(.gz)` or `.fasta(.gz)` files.
 
@@ -22,18 +22,17 @@ Use `generate` to create a single `telomere_analysis_*.csv` file (containing bot
 
 ```
 python analysis/main.py generate \
-  --patterns analysis/telomere_patterns_2x.json \
+  --k 2 \
   [--metadata analysis/greider_methods_table_s2_outliers_removed.csv] \
   --fastq-dir greider_data_download \
   [--csv-out analysis/telomere_analysis_2x_repeat_feb4_2026.csv]
 ```
 
-*   `**--patterns**` (required): path to the telomere patterns JSON file.
+*   `**--k**` (required): number of GGGTTA/CCCTAA repeat units (e.g. `3`).
 *   `**--metadata**` (optional): path to the age/length table CSV.
 *   `**--fastq-dir**` (required): directory containing FASTQ/FASTA input files.
 *   `**--csv-out**` (optional): explicit output CSV path.
-    *   If omitted, the code derives a filename from the patterns `version` field, e.g.  
-        `telomere_analysis_2x_repeat_feb4_2026.csv`.
+    *   If omitted, the code derives a filename from `k`, e.g. `telomere_analysis_2x_repeat.csv`.
 
 The generated CSV contains:
 
@@ -51,7 +50,7 @@ Use `plot` when you already have a normalized `telomere_analysis_*.csv` and just
 
 ```
 python analysis/main.py plot \
-  --patterns analysis/telomere_patterns_2x.json \
+  --k 2 \
   [--csv analysis/telomere_analysis_2x_repeat_feb4_2026.csv] \
   [--no-hist] [--no-signatures] [--no-spearman] \
   [--no-pairwise] [--no-trendlines] [--no-curve]
@@ -59,7 +58,7 @@ python analysis/main.py plot \
 
 Arguments:
 
-*   `**--patterns**` (required): same patterns JSON used when generating the CSV.
+*   `**--k**` (required): same repeat count used when generating the CSV.
     *   Used for labelling plots and, if `--csv` is omitted, to infer the CSV filename.
 *   `**--csv**` (optional): explicit CSV path. If omitted, the CSV path is  
     inferred from the patterns version (expects the single combined CSV naming).
@@ -92,7 +91,7 @@ Use `run` to go from raw FASTQ/FASTA to a CSV and all plots in a single command:
 
 ```
 python analysis/main.py run \
-  --patterns analysis/telomere_patterns_2x.json \
+  --k 2 \
   [--metadata analysis/greider_methods_table_s2_outliers_removed.csv] \
   --fastq-dir greider_data_download \
   [--csv-out analysis/telomere_analysis_2x_repeat_feb4_2026.csv] \
@@ -103,7 +102,7 @@ python analysis/main.py run \
 This:
 
 1.  Calls the `**generate**` step to build the combined CSV (raw + normalized).
-2.  Calls the `**plot**` step with the same patterns file and the freshly generated CSV.
+2.  Calls the `**plot**` step with the same `--k` and the freshly generated CSV.
 
 Flags such as `--no-hist`, `--no-trendlines`, etc., behave the same as for `plot`.
 
@@ -121,7 +120,7 @@ Refer to `analysis/generate_csv.py` and `analysis/plotting.py` if you need to cu
 
 ```
 python analysis/main.py generate \
-  --patterns analysis/telomere_patterns_3x.json \
+  --k 3 \
   --metadata analysis/greider_methods_table_s2_outliers_removed.csv \
   --fastq-dir greider_data_download \
   --csv-out analysis/telomere_analysis_3x_repeat_custom.csv
@@ -129,13 +128,13 @@ python analysis/main.py generate \
 
 ```
 python analysis/main.py plot \
-  --patterns analysis/telomere_patterns_2x.json \
+  --k 2 \
   --csv analysis/telomere_analysis_2x_repeat_feb4_2026_normalized.csv
 ```
 
 ```
 python analysis/main.py run \
-  --patterns analysis/telomere_patterns_2x.json \
+  --k 2 \
   --metadata analysis/greider_methods_table_s2_outliers_removed.csv \
   --fastq-dir greider_data_download
 ```

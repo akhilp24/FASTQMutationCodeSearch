@@ -38,9 +38,10 @@ def _parse_args():
         help="Generate telomere_analysis CSV from FASTQ/FASTA files.",
     )
     gen.add_argument(
-        "--patterns",
+        "--k",
+        type=int,
         required=True,
-        help="Path to telomere patterns JSON (e.g. telomere_patterns_2x.json).",
+        help="Number of GGGTTA/CCCTAA repeat units (must be >= 2), e.g. 3 for 3x_repeat.",
     )
     gen.add_argument(
         "--metadata",
@@ -56,7 +57,7 @@ def _parse_args():
         "--csv-out",
         help=(
             "Optional explicit output CSV path. "
-            "If omitted, generate_csv will derive a filename from the patterns version."
+            "If omitted, generate_csv will derive a filename from the pattern version."
         ),
     )
 
@@ -66,15 +67,16 @@ def _parse_args():
         help="Run plotting pipelines on an existing telomere_analysis CSV.",
     )
     plot.add_argument(
-        "--patterns",
+        "--k",
+        type=int,
         required=True,
-        help="Path to telomere patterns JSON used to generate the CSV (for version labels).",
+        help="Number of GGGTTA/CCCTAA repeat units used to generate the CSV (for version labels).",
     )
     plot.add_argument(
         "--csv",
         help=(
             "Path to telomere_analysis CSV. If omitted, "
-            "it will be inferred from the patterns version."
+            "it will be inferred from the pattern version."
         ),
     )
     plot.add_argument(
@@ -114,9 +116,10 @@ def _parse_args():
         help="Generate CSV from FASTQ/FASTA and then run plotting in one command.",
     )
     run.add_argument(
-        "--patterns",
+        "--k",
+        type=int,
         required=True,
-        help="Path to telomere patterns JSON (e.g. telomere_patterns_2x.json).",
+        help="Number of GGGTTA/CCCTAA repeat units (must be >= 2), e.g. 3 for 3x_repeat.",
     )
     run.add_argument(
         "--metadata",
@@ -132,7 +135,7 @@ def _parse_args():
         "--csv-out",
         help=(
             "Optional explicit output CSV path. "
-            "If omitted, generate_csv will derive a filename from the patterns version."
+            "If omitted, generate_csv will derive a filename from the pattern version."
         ),
     )
     run.add_argument(
@@ -169,11 +172,11 @@ def _parse_args():
     return parser.parse_args()
 
 
-def _resolve_csv_path(patterns_path: str, explicit_csv: str | None) -> str:
+def _resolve_csv_path(k: int, explicit_csv: str | None) -> str:
     if explicit_csv:
         return explicit_csv
-    # Use plotting helper to infer the filename from the patterns version
-    return _default_csv_path_from_patterns(patterns_path)
+    # Use plotting helper to infer the filename from the pattern version
+    return _default_csv_path_from_patterns(k)
 
 
 def _run_generate(args) -> str:
@@ -181,12 +184,12 @@ def _run_generate(args) -> str:
     csv_out = args.csv_out
     generate_csv(
         data_dir=args.fastq_dir,
+        k=args.k,
         metadata_file_path=args.metadata,
-        patterns_file_path=args.patterns,
         output_csv_path=csv_out,
     )
     # If the caller did not specify csv_out, reconstruct what generate_csv used.
-    csv_path = csv_out or _default_csv_path_from_patterns(args.patterns)
+    csv_path = csv_out or _default_csv_path_from_patterns(args.k)
     print(f"CSV written to: {csv_path}")
     return csv_path
 
@@ -199,13 +202,13 @@ def _run_plots(args, csv_path: str):
         plot_histograms_from_csv(csv_path, output_dir=_HISTOGRAM_DIR)
 
     if not args.no_signatures:
-        plot_mutational_signatures_main(args.patterns)
+        plot_mutational_signatures_main(args.k)
 
     if not args.no_spearman:
-        plot_spearman_with_age_main(args.patterns)
+        plot_spearman_with_age_main(args.k)
 
     if not args.no_pairwise:
-        plot_pairwise_r_heatmap_main(args.patterns)
+        plot_pairwise_r_heatmap_main(args.k)
 
     if not args.no_trendlines:
         trendline_output = _unique_output_path(_TRENDLINES_DIR, "trendline", "png")
@@ -228,7 +231,7 @@ def _run_plots(args, csv_path: str):
             spearman_output_path=spearman_output,
             variables=_TRENDLINE_VARIABLES,
             titles=_TRENDLINE_TITLES,
-            patterns_file_path=args.patterns,
+            k=args.k,
         )
 
     if not args.no_curve:
@@ -236,7 +239,7 @@ def _run_plots(args, csv_path: str):
         # but that will match csv_path as long as you followed the generate/run flow.
         from plotting import curve_fitting_analysis_main
 
-        curve_fitting_analysis_main(args.patterns)
+        curve_fitting_analysis_main(args.k)
 
     print("\nAll plotting complete.")
 
@@ -247,7 +250,7 @@ def main():
     if args.command == "generate":
         _run_generate(args)
     elif args.command == "plot":
-        csv_path = _resolve_csv_path(args.patterns, args.csv)
+        csv_path = _resolve_csv_path(args.k, args.csv)
         _run_plots(args, csv_path)
     elif args.command == "run":
         csv_path = _run_generate(args)

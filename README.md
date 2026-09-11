@@ -14,7 +14,7 @@ The current workflow is centered on `analysis/main.py`, which provides a command
 - Install dependencies:
 
 ```bash
-pip install numpy pandas matplotlib seaborn scipy HTSeq
+pip install numpy pandas matplotlib seaborn scipy
 ```
 
 ## Repository Layout
@@ -23,10 +23,13 @@ pip install numpy pandas matplotlib seaborn scipy HTSeq
 analysis/
   main.py                                     # CLI entrypoint (generate, plot, run)
   generate_csv.py                             # Sequence parsing + feature/CSV generation
+  pattern_generator.py                        # Programmatic k-repeat pattern generation (single-phase)
   plotting.py                                 # Plotting pipelines (signatures, spearman, trendlines, curve fitting)
+  telomere_analysis.ipynb                     # Notebook walkthrough of the local FASTQ/FASTA pipeline
+  ukb/                                        # UKB/DNAnexus CRAM notebooks (separate, 6-phase detection algorithm)
+    telomere_analysis_ukb_cram_update_fixed.ipynb   # current UKB pipeline
+    telomere_analysis_ukb_cram_update.ipynb         # earlier iteration, kept for reference
   usage.md                                    # More detailed command reference
-  telomere_patterns_2x.json                   # 2x repeat pattern definitions (versioned)
-  telomere_patterns_3x.json                   # 3x repeat pattern definitions (versioned)
   greider_methods_table_s2_outliers_removed.csv
   histograms/                                 # Histogram outputs
   plots/                                      # Per-sample mutational signature bar plots
@@ -43,9 +46,8 @@ data/, old/                                   # Legacy and reference data/materi
 
 1. Put sequence files in `greider_data_download/`.
    - Supported formats: `.fastq`, `.fastq.gz`, `.fasta`, `.fasta.gz`, `.fa`, `.fa.gz`, `.fas`, `.fas.gz`
-2. Provide a patterns file:
-   - `analysis/telomere_patterns_2x.json` or
-   - `analysis/telomere_patterns_3x.json`
+2. Choose the repeat count `k` (number of GGGTTA/CCCTAA repeats, e.g. `3`). Patterns are generated
+   programmatically by `pattern_generator.py` — no patterns file needed.
 3. (Optional but recommended) Provide metadata CSV:
    - `analysis/greider_methods_table_s2_outliers_removed.csv`
    - Required columns: `fastq file name`, `Age (Years)`, `Mean Telomere Length (bps)`
@@ -62,20 +64,20 @@ python analysis/main.py <command> [options]
 
 ```bash
 python analysis/main.py generate \
-  --patterns analysis/telomere_patterns_2x.json \
+  --k 3 \
   --fastq-dir greider_data_download \
   --metadata analysis/greider_methods_table_s2_outliers_removed.csv
 ```
 
-- Produces a versioned CSV such as `telomere_analysis_2x_repeat.csv` (or a custom file if `--csv-out` is provided).
+- Produces a versioned CSV such as `telomere_analysis_3x_repeat.csv` (or a custom file if `--csv-out` is provided).
 - CSV includes raw mutation counts, strand-normalized per-1k rates, grouped mutation features, and engineered fields.
 
 ### 2) Plot from existing CSV
 
 ```bash
 python analysis/main.py plot \
-  --patterns analysis/telomere_patterns_2x.json \
-  --csv analysis/telomere_analysis_2x_repeat.csv
+  --k 3 \
+  --csv analysis/telomere_analysis_3x_repeat.csv
 ```
 
 Skip plot groups as needed:
@@ -91,14 +93,21 @@ Skip plot groups as needed:
 
 ```bash
 python analysis/main.py run \
-  --patterns analysis/telomere_patterns_2x.json \
+  --k 3 \
   --fastq-dir greider_data_download \
   --metadata analysis/greider_methods_table_s2_outliers_removed.csv
 ```
 
+### Notebook walkthrough
+
+`analysis/telomere_analysis.ipynb` runs the same pipeline interactively, cell by cell, for the local
+FASTQ/FASTA data — useful for exploring intermediate output. For the UK Biobank/DNAnexus CRAM pipeline
+(a different input format with an intentionally separate, more thorough 6-phase detection algorithm),
+see `analysis/ukb/telomere_analysis_ukb_cram_update_fixed.ipynb`.
+
 ## Outputs
 
-- **Main CSV**: `telomere_analysis_<patterns-version>.csv`
+- **Main CSV**: `telomere_analysis_<k>x_repeat.csv`
 - **Per-sample mutational signature plots**: `analysis/plots/`
 - **Histogram outputs**: `analysis/histograms/`
 - **Spearman outputs**: `analysis/spearman's plots/` and `analysis/spearman_correlations/`
@@ -107,7 +116,7 @@ python analysis/main.py run \
 
 ## Notes
 
-- Pattern version in JSON (for example, `2x_repeat`, `3x_repeat`) drives default output naming.
+- The repeat count `k` (for example, `2`, `3`) drives default output naming (`2x_repeat`, `3x_repeat`).
 - Metadata is optional in CSV generation; if unavailable, `Age` and `Telomere_Length` fields are left blank.
 - Some output files are timestamped to avoid overwriting previous runs.
 
@@ -116,4 +125,4 @@ python analysis/main.py run \
 - **No sequence files found**: verify `--fastq-dir` path and file extensions.
 - **Missing metadata values**: check sample-name normalization (metadata uses names mapped from underscores to dots).
 - **Import errors**: reinstall dependencies in the active environment.
-- **Unexpected CSV name resolution**: ensure `--patterns` points to the same JSON used to generate the CSV.
+- **Unexpected CSV name resolution**: ensure `--k` matches the repeat count used to generate the CSV.

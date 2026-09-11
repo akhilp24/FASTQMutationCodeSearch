@@ -29,8 +29,13 @@ def read_sequence_file(file_path: str):
     open_func = gzip.open if file_path.endswith('.gz') else open
     mode = 'rt' if file_path.endswith('.gz') else 'r'
 
-    # Detect format by file extension
-    is_fasta = any(ext in file_path.lower() for ext in ['.fasta', '.fa', '.fas'])
+    # Detect format by file extension (match the real suffix, not a substring:
+    # '.fa' is a substring of '.fastq', which would mis-detect every FASTQ as FASTA)
+    name = os.path.basename(file_path).lower()
+    if name.endswith('.gz'):
+        name = name[:-len('.gz')]
+    is_fasta = any(name.endswith(ext) for ext in ['.fasta', '.fa', '.fas'])
+
 
     with open_func(file_path, mode) as f:
         if is_fasta:
